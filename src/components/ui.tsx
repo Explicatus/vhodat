@@ -1,0 +1,59 @@
+import Link from "next/link";
+
+export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-bold">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+export function Card({ title, children, className = "", action }: { title?: string; children: React.ReactNode; className?: string; action?: React.ReactNode }) {
+  return (
+    <section className={`card ${className}`}>
+      {(title || action) && (
+        <div className="mb-4 flex items-center justify-between gap-2">
+          {title && <h2 className="text-base font-semibold">{title}</h2>}
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+export function Stat({ label, value, hint, tone = "default" }: { label: string; value: string; hint?: string; tone?: "default" | "good" | "bad" }) {
+  const color = tone === "good" ? "text-green-600" : tone === "bad" ? "text-red-600" : "text-slate-900";
+  return (
+    <div className="card">
+      <div className="text-sm text-slate-500">{label}</div>
+      <div className={`mt-1 text-2xl font-bold ${color}`}>{value}</div>
+      {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
+    </div>
+  );
+}
+
+export function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="label">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+export function Empty({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">{children}</div>;
+}
+
+export function Badge({ children, className = "bg-slate-100 text-slate-700" }: { children: React.ReactNode; className?: string }) {
+  return <span className={`badge ${className}`}>{children}</span>;
+}
+
+export function LinkButton({ href, children, variant = "primary" }: { href: string; children: React.ReactNode; variant?: "primary" | "secondary" }) {
+  return <Link href={href} className={variant === "primary" ? "btn-primary" : "btn-secondary"}>{children}</Link>;
+}
