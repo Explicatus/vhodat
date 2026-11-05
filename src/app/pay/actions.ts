@@ -7,12 +7,13 @@ import { cents } from "@/lib/util";
 
 /** Собственик стартира плащане с карта за своя обект. */
 export async function startCardPayment(form: FormData) {
-  const { user, building, membership } = await requireMembership();
-  if (!membership.unitId) redirect("/finance");
+  const { user, building, unitIds } = await requireMembership();
+  const unitId = String(form.get("unitId") || unitIds[0] || "");
+  if (!unitIds.includes(unitId)) redirect("/finance");
   if (!onlineEnabled(building)) redirect("/finance?pay=disabled");
   const amountCents = cents(form, "amount");
   if (amountCents < MIN_ONLINE || amountCents > MAX_ONLINE) redirect("/finance?pay=amount");
-  const unit = await db.unit.findFirst({ where: { id: membership.unitId, buildingId: building.id } });
+  const unit = await db.unit.findFirst({ where: { id: unitId, buildingId: building.id } });
   if (!unit) redirect("/finance");
 
   const mock = mockMode();

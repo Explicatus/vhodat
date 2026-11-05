@@ -77,7 +77,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <footer className="py-8 text-center text-sm text-slate-500">© {new Date().getFullYear()} Входът</footer>
+      <footer className="py-8 text-center text-sm text-slate-500">© {new Date().getFullYear()} Входът · <Link href="/privacy" className="hover:underline">Поверителност</Link> · <Link href="/terms" className="hover:underline">Общи условия</Link></footer>
     </div>
   );
 }

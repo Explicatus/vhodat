@@ -54,7 +54,7 @@ export async function notify(t: Target, m: Msg) {
     where: {
       buildingId: t.buildingId,
       ...(t.userIds ? { userId: { in: t.userIds } } : {}),
-      ...(t.unitIds ? { unitId: { in: t.unitIds } } : {}),
+      ...(t.unitIds ? { units: { some: { unitId: { in: t.unitIds } } } } : {}),
       ...(t.roles ? { role: { in: t.roles } } : {}),
     },
     include: { user: true },

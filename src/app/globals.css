@@ -141,3 +141,9 @@
   main { padding: 0 !important; }
   .doc { box-shadow: none; padding: 0; border-radius: 0; }
 }
+
+/* Правни страници */
+.legal h2 { @apply mt-6 text-lg font-semibold; }
+.legal p, .legal li { @apply text-sm leading-relaxed; }
+.legal ul { @apply list-disc space-y-1 pl-5; }
+.legal a { @apply text-brand-600 underline; }

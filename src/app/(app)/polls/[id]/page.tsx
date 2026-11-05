@@ -9,7 +9,7 @@ import { closePoll, deletePoll, vote } from "../actions";
 
 export default async function PollPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { building, isManager, membership } = await requireMembership();
+  const { building, isManager, units: myUnits, unitIds } = await requireMembership();
   const poll = await db.poll.findFirst({
     where: { id, buildingId: building.id },
     include: { options: { orderBy: { order: "asc" } }, votes: { include: { unit: true, user: true } } },
@@ -18,7 +18,9 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
   const units = await db.unit.findMany({ where: { buildingId: building.id }, select: { idealParts: true } });
   const totalIdeal = units.reduce((s, u) => s + u.idealParts, 0);
   const open = poll.closesAt > new Date();
-  const myVote = membership.unitId ? poll.votes.find((v) => v.unitId === membership.unitId) : undefined;
+  const myVotes = poll.votes.filter((v) => unitIds.includes(v.unitId));
+  const myVote = myVotes[0];
+  const label = (optionId: string) => poll.options.find((o) => o.id === optionId)?.label;
   const turnoutIdeal = poll.votes.reduce((s, v) => s + v.unit.idealParts, 0);
 
   const results = poll.options.map((o) => {
@@ -60,15 +62,32 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
         </div>
         <div className="space-y-6">
           <Card title="Вашият глас">
-            {!membership.unitId ? <p className="text-sm text-slate-500">За да гласувате, профилът ви трябва да е свързан с обект.</p>
-              : !open ? <p className="text-sm text-slate-500">Гласуването е приключило.{myVote && <> Гласувахте: <b>{poll.options.find((o) => o.id === myVote.optionId)?.label}</b></>}</p>
-              : (
+            {myUnits.length === 0 ? <p className="text-sm text-slate-500">За да гласувате, профилът ви трябва да е свързан с обект.</p>
+              : !open ? (
+                <div className="text-sm text-slate-500">Гласуването е приключило.
+                  {myVotes.map((v) => <div key={v.id}>Обект {myUnits.find((u) => u.id === v.unitId)?.number}: <b>{label(v.optionId)}</b></div>)}
+                </div>
+              ) : (
                 <form action={vote.bind(null, poll.id)} className="space-y-2">
                   {poll.options.map((o) => (
-                    <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/40 p-3 text-sm hover:bg-white/25">
+                    <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/40 p-3 text-sm hover:bg-white/25">
                       <input type="radio" name="optionId" value={o.id} defaultChecked={myVote?.optionId === o.id} required /> {o.label}
                     </label>
                   ))}
+                  {myUnits.length > 1 ? (
+                    <fieldset className="rounded-xl border border-white/40 p-3 text-sm">
+                      <legend className="px-1 text-xs text-slate-500">Гласувам за обекти</legend>
+                      {myUnits.map((u) => {
+                        const v = myVotes.find((x) => x.unitId === u.id);
+                        return (
+                          <label key={u.id} className="flex items-center gap-2 py-0.5">
+                            <input type="checkbox" name="unitId" value={u.id} defaultChecked className="accent-brand-600" />
+                            Обект {u.number} <span className="text-xs text-slate-400">({u.idealParts}% ид.ч.{v ? ` · сега: ${label(v.optionId)}` : ""})</span>
+                          </label>
+                        );
+                      })}
+                    </fieldset>
+                  ) : <input type="hidden" name="unitId" value={myUnits[0].id} />}
                   <SubmitButton className="btn-primary w-full">{myVote ? "Промени гласа" : "Гласувай"}</SubmitButton>
                 </form>
               )}

@@ -22,6 +22,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <label className="block"><span className="label">Имейл</span><input name="email" type="email" required className="input" /></label>
           <label className="block"><span className="label">Парола</span><input name="password" type="password" required minLength={mode === "register" ? 8 : undefined} autoComplete={mode === "login" ? "current-password" : "new-password"} className="input" /></label>
           {mode === "login" && <div className="-mt-2 text-right"><Link href="/forgot" className="text-xs text-brand-600 hover:underline">Забравена парола?</Link></div>}
+          {mode === "register" && (
+            <label className="flex items-start gap-2 text-xs text-slate-600">
+              <input type="checkbox" name="terms" required className="mt-0.5 h-4 w-4 accent-brand-600" />
+              <span>Приемам <Link href="/terms" target="_blank" className="text-brand-600 underline">Общите условия</Link> и <Link href="/privacy" target="_blank" className="text-brand-600 underline">Политиката за поверителност</Link>.</span>
+            </label>
+          )}
           <SubmitButton className="btn-primary w-full">{mode === "login" ? "Вход" : "Регистрация"}</SubmitButton>
           <p className="text-center text-sm text-slate-500">
             {mode === "login" ? (

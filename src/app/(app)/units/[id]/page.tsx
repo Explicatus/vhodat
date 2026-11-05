@@ -17,7 +17,7 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
     include: {
       charges: { orderBy: { dueDate: "desc" } },
       payments: { orderBy: { paidAt: "desc" } },
-      memberships: { include: { user: true } },
+      memberUnits: { include: { membership: { include: { user: true } } } },
     },
   });
   if (!unit) notFound();
@@ -60,8 +60,8 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
           </table>
         </Card>
         <Card title="Свързани потребители" className="lg:col-span-2">
-          {unit.memberships.length === 0 ? <p className="text-sm text-slate-500">Никой не е свързан. Свържете потребители от „Настройки → Членове“.</p> : (
-            <ul className="text-sm">{unit.memberships.map((m) => <li key={m.id}>{m.user.name} · {m.user.email}</li>)}</ul>
+          {unit.memberUnits.length === 0 ? <p className="text-sm text-slate-500">Никой не е свързан. Свържете потребители от „Настройки → Членове“.</p> : (
+            <ul className="text-sm">{unit.memberUnits.map((mu) => <li key={mu.id}>{mu.membership.user.name} · {mu.membership.user.email}</li>)}</ul>
           )}
         </Card>
         <Card title="Редакция" className="lg:col-span-2">

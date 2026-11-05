@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { unitBalances } from "@/lib/finance";
+import { AUDIT_ACTIONS } from "@/lib/audit";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/lib/format";
 
 /** Центове → „12,50“ (формат за Excel на български). */
@@ -32,6 +33,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ kind: stri
     const rows = await db.expense.findMany({ where: { buildingId: m.buildingId }, orderBy: { date: "asc" } });
     body = csv([["Дата", "Категория", "Описание", "Доставчик", "Сума"],
       ...rows.map((e) => [e.date.toISOString().slice(0, 10), EXPENSE_CATEGORIES[e.category] ?? e.category, e.description, e.vendor, eur(e.amountCents)])]);
+  } else if (kind === "audit") {
+    const rows = await db.auditLog.findMany({ where: { buildingId: m.buildingId }, orderBy: { createdAt: "asc" } });
+    body = csv([["Дата и час", "Потребител", "Действие", "Подробности", "Сума"],
+      ...rows.map((a) => [a.createdAt.toISOString().replace("T", " ").slice(0, 19), a.userName, AUDIT_ACTIONS[a.action] ?? a.action, a.summary, a.amountCents != null ? eur(a.amountCents) : ""])]);
   } else return new NextResponse("Not found", { status: 404 });
 
   return new NextResponse(body, {

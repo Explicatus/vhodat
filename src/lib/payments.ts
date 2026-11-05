@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { headers } from "next/headers";
 import { db } from "./db";
 import { notify } from "./notify";
+import { audit } from "./audit";
 
 let _stripe: Stripe | null = null;
 export function stripe() {
@@ -51,6 +52,8 @@ export async function markOnlinePaid(onlinePaymentId: string, providerRef?: stri
   });
   if (won) {
     const unit = await db.unit.findUnique({ where: { id: won.unitId } });
+    const payer = await db.user.findUnique({ where: { id: won.userId }, select: { id: true, name: true } });
+    await audit(won.buildingId, payer, "payment.online", `Плащане с карта за обект ${unit?.number}`, won.amountCents);
     const amt = new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR" }).format(won.amountCents / 100);
     await notify({ buildingId: won.buildingId, unitIds: [won.unitId] }, { title: "Плащането е успешно", body: `Получихме ${amt} с карта за обект ${unit?.number}.`, link: "/finance" });
     await notify({ buildingId: won.buildingId, roles: ["MANAGER"] }, { title: "💳 Онлайн плащане", body: `Обект ${unit?.number} плати ${amt} с карта.`, link: "/finance" });
