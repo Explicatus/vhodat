@@ -8,9 +8,9 @@ type Target = { buildingId: string; userIds?: string[]; unitIds?: string[]; role
 const base = () => (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
 
 let transport: nodemailer.Transporter | null = null;
-async function sendEmail(to: string, m: Msg) {
+export async function sendEmail(to: string, m: Msg) {
   const url = m.link ? `${base()}${m.link}` : base();
-  if (!process.env.SMTP_HOST) return console.log(`[email → ${to}] ${m.title}: ${m.body}`);
+  if (!process.env.SMTP_HOST) return console.log(`[email → ${to}] ${m.title}: ${m.body} ${url}`);
   transport ??= nodemailer.createTransport({
     host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587),
     auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,

@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireManager } from "@/lib/auth";
 import { optStr, randomCode, str } from "@/lib/util";
+import { notify } from "@/lib/notify";
 
 export async function updateBuilding(form: FormData) {
   const { building } = await requireManager();
@@ -27,7 +28,7 @@ export async function updateMember(membershipId: string, form: FormData) {
   // не позволяваме управителят сам да си свали правата
   await db.membership.updateMany({
     where: { id: membershipId, buildingId: building.id },
-    data: { unitId, role: membershipId === me.id ? "MANAGER" : role },
+    data: { unitId, requestedUnitId: null, role: membershipId === me.id ? "MANAGER" : role },
   });
   revalidatePath("/settings");
 }
@@ -75,4 +76,20 @@ export async function stripeDashboard() {
   if (!building.stripeAccountId) return;
   const l = await stripe().accounts.createLoginLink(building.stripeAccountId);
   redirect(l.url);
+}
+
+/** Одобрява или отхвърля заявка на потребител за свързване с обект. */
+export async function decideUnitRequest(membershipId: string, approve: boolean) {
+  const { building } = await requireManager();
+  const m = await db.membership.findFirst({ where: { id: membershipId, buildingId: building.id, requestedUnitId: { not: null } } });
+  if (!m) return;
+  const unit = await db.unit.findFirst({ where: { id: m.requestedUnitId!, buildingId: building.id } });
+  await db.membership.update({
+    where: { id: m.id },
+    data: approve && unit ? { unitId: unit.id, requestedUnitId: null } : { requestedUnitId: null },
+  });
+  await notify({ buildingId: building.id, userIds: [m.userId] }, approve && unit
+    ? { title: "Заявката е одобрена", body: `Профилът ви е свързан с обект ${unit.number}. Вече виждате задълженията си и можете да гласувате.`, link: "/finance" }
+    : { title: "Заявката е отхвърлена", body: `Управителят не одобри свързването с обект ${unit?.number ?? ""}. Свържете се с него за повече информация.`, link: "/dashboard" });
+  revalidatePath("/settings");
 }

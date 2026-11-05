@@ -3,7 +3,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireManager } from "@/lib/auth";
-import { num, optStr, str } from "@/lib/util";
+import { cents, num, optStr, str } from "@/lib/util";
+import { allocate } from "@/lib/format";
 import { remainingUnits, syncSubscriptionQuantity } from "@/lib/billing";
 
 function unitData(form: FormData) {
@@ -18,7 +19,7 @@ function unitData(form: FormData) {
     ownerName: optStr(form, "ownerName"),
     ownerEmail: optStr(form, "ownerEmail"),
     residents: Math.max(0, Math.round(num(form, "residents"))),
-    monthlyFee: num(form, "monthlyFee"),
+    monthlyFeeCents: cents(form, "monthlyFee"),
   };
 }
 
@@ -53,7 +54,7 @@ export async function bulkCreateUnits(form: FormData) {
       floor: floor ? parseInt(floor, 10) || null : null,
       ownerName: ownerName || null,
       residents: residents ? parseInt(residents, 10) || 0 : 1,
-      monthlyFee: fee ? parseFloat(fee.replace(",", ".")) || 0 : 0,
+      monthlyFeeCents: fee ? Math.round((parseFloat(fee.replace(",", ".")) || 0) * 100) : 0,
       idealParts: ideal ? parseFloat(ideal.replace(",", ".")) || 0 : 0,
     };
     await db.unit.upsert({
@@ -84,16 +85,13 @@ export async function deleteUnit(id: string) {
 /** Разпределя месечна такса пропорционално: по живущи или по идеални части. */
 export async function distributeFees(form: FormData) {
   const { building } = await requireManager();
-  const total = num(form, "total");
+  const total = cents(form, "total");
   const basis = str(form, "basis"); // residents | idealParts | equal
   const units = await db.unit.findMany({ where: { buildingId: building.id } });
   const weight = (u: (typeof units)[number]) => (basis === "residents" ? u.residents : basis === "idealParts" ? u.idealParts : 1);
   const sum = units.reduce((s, u) => s + weight(u), 0);
   if (!sum || total <= 0) return;
-  await db.$transaction(
-    units.map((u) =>
-      db.unit.update({ where: { id: u.id }, data: { monthlyFee: Math.round((total * weight(u) / sum) * 100) / 100 } }),
-    ),
-  );
+  const shares = allocate(total, units.map(weight));
+  await db.$transaction(units.map((u, i) => db.unit.update({ where: { id: u.id }, data: { monthlyFeeCents: shares[i] } })));
   revalidatePath("/units");
 }

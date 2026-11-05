@@ -23,7 +23,7 @@ export default async function MockCheckout({ params }: { params: Promise<{ id: s
           <div>
             <div className="text-sm text-slate-500">{op.building.name}</div>
             <div className="text-lg font-semibold">Такси — обект {op.unit.number}</div>
-            <div className="mt-2 text-3xl font-bold">{money(op.amount)}</div>
+            <div className="mt-2 text-3xl font-bold">{money(op.amountCents)}</div>
           </div>
           <div className="space-y-2">
             <input className="input font-mono" defaultValue="4242 4242 4242 4242" readOnly />
@@ -33,7 +33,7 @@ export default async function MockCheckout({ params }: { params: Promise<{ id: s
             </div>
           </div>
           <form action={completeMockPayment.bind(null, op.id, true)}>
-            <SubmitButton className="btn-primary w-full py-3">Плати {money(op.amount)}</SubmitButton>
+            <SubmitButton className="btn-primary w-full py-3">Плати {money(op.amountCents)}</SubmitButton>
           </form>
           <form action={completeMockPayment.bind(null, op.id, false)}>
             <SubmitButton className="btn-secondary w-full">Откажи</SubmitButton>

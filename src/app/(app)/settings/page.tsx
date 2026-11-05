@@ -2,7 +2,7 @@ import { requireManager } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
-import { connectStripe, regenerateInvite, removeMember, stripeDashboard, updateBuilding, updateMember } from "./actions";
+import { connectStripe, decideUnitRequest, regenerateInvite, removeMember, stripeDashboard, updateBuilding, updateMember } from "./actions";
 import { mockMode, platformFeePercent, stripeConfigured } from "@/lib/payments";
 
 export default async function Settings() {
@@ -11,9 +11,33 @@ export default async function Settings() {
     db.membership.findMany({ where: { buildingId: building.id }, include: { user: true, unit: true }, orderBy: { createdAt: "asc" } }),
     db.unit.findMany({ where: { buildingId: building.id }, orderBy: { number: "asc" } }),
   ]);
+  const requests = members.filter((m) => m.requestedUnitId);
+  const unitById = new Map(units.map((u) => [u.id, u]));
   return (
     <>
       <PageHeader title="Настройки" />
+      {requests.length > 0 && (
+        <Card title={`🙋 Заявки за свързване с обект (${requests.length})`} className="mb-6 ring-2 ring-amber-400/60">
+          <p className="mb-3 text-sm text-slate-500">Проверете, че човекът наистина е собственик или обитател на обекта, преди да одобрите — след одобрение вижда задълженията и гласува от името на обекта.</p>
+          <ul className="space-y-2">
+            {requests.map((m) => {
+              const u = unitById.get(m.requestedUnitId!);
+              return (
+                <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/40 bg-white/20 p-3">
+                  <div className="text-sm">
+                    <div className="font-semibold">{m.user.name} → обект {u?.number ?? "?"}</div>
+                    <div className="text-xs text-slate-500">{m.user.email}{m.user.phone ? ` · ${m.user.phone}` : ""}{u?.ownerName ? ` · собственик по книга: ${u.ownerName}` : ""}{u?.ownerEmail && u.ownerEmail.toLowerCase() === m.user.email.toLowerCase() ? " · ✅ имейлът съвпада" : ""}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <form action={decideUnitRequest.bind(null, m.id, true)}><SubmitButton className="btn-primary btn-sm">Одобри</SubmitButton></form>
+                    <form action={decideUnitRequest.bind(null, m.id, false)}><SubmitButton className="btn-secondary btn-sm" confirm="Отхвърляне на заявката?">Отхвърли</SubmitButton></form>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Етажна собственост">
           <form action={updateBuilding} className="space-y-3">

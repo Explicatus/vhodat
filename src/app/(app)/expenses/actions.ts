@@ -2,16 +2,16 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireManager } from "@/lib/auth";
-import { num, optStr, str } from "@/lib/util";
+import { cents, optStr, str } from "@/lib/util";
 
 export async function createExpense(form: FormData) {
   const { building } = await requireManager();
-  const amount = num(form, "amount");
+  const amountCents = cents(form, "amount");
   const description = str(form, "description");
-  if (amount <= 0 || !description) return;
+  if (amountCents <= 0 || !description) return;
   const d = str(form, "date");
   await db.expense.create({
-    data: { buildingId: building.id, amount, description, category: str(form, "category") || "OTHER", vendor: optStr(form, "vendor"), date: d ? new Date(d) : new Date() },
+    data: { buildingId: building.id, amountCents, description, category: str(form, "category") || "OTHER", vendor: optStr(form, "vendor"), date: d ? new Date(d) : new Date() },
   });
   revalidatePath("/expenses");
 }

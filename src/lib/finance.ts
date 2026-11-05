@@ -7,26 +7,25 @@ export async function unitBalances(buildingId: string) {
     orderBy: [{ entrance: "asc" }, { floor: "asc" }, { number: "asc" }],
   });
   const [charges, payments] = await Promise.all([
-    db.charge.groupBy({ by: ["unitId"], where: { unit: { buildingId } }, _sum: { amount: true } }),
-    db.payment.groupBy({ by: ["unitId"], where: { unit: { buildingId } }, _sum: { amount: true } }),
+    db.charge.groupBy({ by: ["unitId"], where: { unit: { buildingId } }, _sum: { amountCents: true } }),
+    db.payment.groupBy({ by: ["unitId"], where: { unit: { buildingId } }, _sum: { amountCents: true } }),
   ]);
-  const c = new Map(charges.map((x) => [x.unitId, x._sum.amount ?? 0]));
-  const p = new Map(payments.map((x) => [x.unitId, x._sum.amount ?? 0]));
+  const c = new Map(charges.map((x) => [x.unitId, x._sum?.amountCents ?? 0]));
+  const p = new Map(payments.map((x) => [x.unitId, x._sum?.amountCents ?? 0]));
   return units.map((u) => {
     const charged = c.get(u.id) ?? 0;
     const paid = p.get(u.id) ?? 0;
-    return { unit: u, charged, paid, balance: round(charged - paid) };
+    return { unit: u, charged, paid, balance: charged - paid };
   });
 }
 
 export async function buildingCash(buildingId: string) {
   const [paid, spent] = await Promise.all([
-    db.payment.aggregate({ where: { unit: { buildingId } }, _sum: { amount: true } }),
-    db.expense.aggregate({ where: { buildingId }, _sum: { amount: true } }),
+    db.payment.aggregate({ where: { unit: { buildingId } }, _sum: { amountCents: true } }),
+    db.expense.aggregate({ where: { buildingId }, _sum: { amountCents: true } }),
   ]);
-  const income = paid._sum.amount ?? 0;
-  const expenses = spent._sum.amount ?? 0;
-  return { income, expenses, cash: round(income - expenses) };
+  const income = paid._sum?.amountCents ?? 0;
+  const expenses = spent._sum?.amountCents ?? 0;
+  return { income, expenses, cash: income - expenses };
 }
 
-export const round = (n: number) => Math.round(n * 100) / 100;

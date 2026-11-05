@@ -2,12 +2,12 @@ import Link from "next/link";
 import { requireMembership } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { unitBalances } from "@/lib/finance";
-import { CHARGE_TYPES, currentPeriod, date, money, PAYMENT_METHODS, periodLabel } from "@/lib/format";
+import { CHARGE_TYPES, euroInput, currentPeriod, date, money, PAYMENT_METHODS, periodLabel } from "@/lib/format";
 import { Card, Empty, PageHeader, Stat } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { onlineEnabled, MAX_ONLINE } from "@/lib/payments";
 import { startCardPayment } from "@/app/pay/actions";
-import { deletePayment, generateMonthly, oneTimeCharge, recordPayment, remindDebtors } from "./actions";
+import { reverseChargeBatch, deletePayment, generateMonthly, oneTimeCharge, recordPayment, remindDebtors } from "./actions";
 
 export default async function Finance() {
   const ctx = await requireMembership();
@@ -15,6 +15,12 @@ export default async function Finance() {
 }
 
 async function ManagerFinance({ buildingId }: { buildingId: string }) {
+  const batches = await db.charge.groupBy({
+    by: ["period", "type", "description"],
+    where: { unit: { buildingId } },
+    _sum: { amountCents: true }, _count: { _all: true }, _max: { createdAt: true },
+    orderBy: { _max: { createdAt: "desc" } }, take: 8,
+  });
   const [balances, payments] = await Promise.all([
     unitBalances(buildingId),
     db.payment.findMany({ where: { unit: { buildingId } }, include: { unit: true }, orderBy: { paidAt: "desc" }, take: 20 }),
@@ -85,6 +91,31 @@ async function ManagerFinance({ buildingId }: { buildingId: string }) {
         </Card>
       </div>
 
+      <Card title="🧾 Последни начисления" className="mt-6">
+        <p className="mb-3 text-xs text-slate-500">Сгрешено начисление? „Сторнирай“ го премахва от всички обекти наведнъж. Отделно задължение се изтрива от страницата на обекта.</p>
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead><tr><th>Период</th><th>Описание</th><th>Обекти</th><th className="text-right">Общо</th><th /></tr></thead>
+            <tbody>
+              {batches.map((b) => (
+                <tr key={`${b.period}|${b.type}|${b.description}`}>
+                  <td className="whitespace-nowrap">{periodLabel(b.period)}</td>
+                  <td>{b.description || CHARGE_TYPES[b.type]}</td>
+                  <td>{b._count._all}</td>
+                  <td className="text-right font-medium">{money(b._sum?.amountCents ?? 0)}</td>
+                  <td className="text-right">
+                    <form action={reverseChargeBatch.bind(null, b.period, b.type, b.description)}>
+                      <SubmitButton className="btn-secondary btn-sm" confirm={`Сторниране на „${b.description}“ за ${b._count._all} обекта?`}>Сторнирай</SubmitButton>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+              {batches.length === 0 && <tr><td className="text-slate-400">Няма начисления.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title="Салда по обекти">
           <div className="max-h-[480px] overflow-y-auto">
@@ -111,7 +142,7 @@ async function ManagerFinance({ buildingId }: { buildingId: string }) {
                   <tr key={p.id}>
                     <td>{date(p.paidAt)}</td>
                     <td>Обект {p.unit.number}<div className="text-xs text-slate-400">{PAYMENT_METHODS[p.method]}{p.note ? ` · ${p.note}` : ""}</div></td>
-                    <td className="text-right font-medium text-green-700">{money(p.amount)}</td>
+                    <td className="text-right font-medium text-green-700">{money(p.amountCents)}</td>
                     <td className="whitespace-nowrap text-right">
                       <Link href={`/finance/receipt/${p.id}`} className="btn-secondary btn-sm">Разписка</Link>{" "}
                       <form action={deletePayment.bind(null, p.id)} className="inline"><SubmitButton className="btn-secondary btn-sm" confirm="Изтриване на плащането?">✕</SubmitButton></form>
@@ -131,12 +162,12 @@ async function ResidentFinance({ unitId, iban, name, online }: { unitId: string 
   if (!unitId) return (<><PageHeader title="Моите задължения" /><Empty>Профилът ви още не е свързан с обект. Свържете се с домоуправителя.</Empty></>);
   const unit = await db.unit.findUnique({ where: { id: unitId }, include: { charges: { orderBy: { dueDate: "desc" } }, payments: { orderBy: { paidAt: "desc" } } } });
   if (!unit) return null;
-  const charged = unit.charges.reduce((s, c) => s + c.amount, 0);
-  const paid = unit.payments.reduce((s, p) => s + p.amount, 0);
-  const balance = Math.round((charged - paid) * 100) / 100;
+  const charged = unit.charges.reduce((s, c) => s + c.amountCents, 0);
+  const paid = unit.payments.reduce((s, p) => s + p.amountCents, 0);
+  const balance = charged - paid;
   return (
     <>
-      <PageHeader title="Моите задължения" subtitle={`Обект ${unit.number} · месечна такса ${money(unit.monthlyFee)}`} />
+      <PageHeader title="Моите задължения" subtitle={`Обект ${unit.number} · месечна такса ${money(unit.monthlyFeeCents)}`} />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat label="Салдо" value={money(Math.abs(balance))} hint={balance > 0 ? "Дължима сума" : balance < 0 ? "Надплатено" : "Нямате задължения"} tone={balance > 0 ? "bad" : "good"} />
         <Stat label="Общо начислено" value={money(charged)} />
@@ -146,7 +177,7 @@ async function ResidentFinance({ unitId, iban, name, online }: { unitId: string 
         <Card title="💳 Плащане с карта" className="mb-6">
           <form action={startCardPayment} className="flex flex-wrap items-end gap-3">
             <label className="block"><span className="label">Сума (€)</span>
-              <input name="amount" type="number" step="0.01" min={1} max={MAX_ONLINE} defaultValue={balance > 0 ? balance.toFixed(2) : unit.monthlyFee.toFixed(2)} required className="input w-40" />
+              <input name="amount" type="number" step="0.01" min={1} max={MAX_ONLINE / 100} defaultValue={euroInput(balance > 0 ? balance : unit.monthlyFeeCents)} required className="input w-40" />
             </label>
             <SubmitButton>{balance > 0 ? "Плати задължението" : "Плати авансово"}</SubmitButton>
             <span className="text-xs text-slate-500">Visa, Mastercard, Apple Pay, Google Pay · защитено от Stripe</span>
@@ -161,13 +192,13 @@ async function ResidentFinance({ unitId, iban, name, online }: { unitId: string 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Задължения">
           <table className="table"><tbody>
-            {unit.charges.map((c) => <tr key={c.id}><td>{periodLabel(c.period)}</td><td>{c.description || CHARGE_TYPES[c.type]}</td><td className="text-right">{money(c.amount)}</td></tr>)}
+            {unit.charges.map((c) => <tr key={c.id}><td>{periodLabel(c.period)}</td><td>{c.description || CHARGE_TYPES[c.type]}</td><td className="text-right">{money(c.amountCents)}</td></tr>)}
             {unit.charges.length === 0 && <tr><td className="text-slate-400">Няма</td></tr>}
           </tbody></table>
         </Card>
         <Card title="Плащания">
           <table className="table"><tbody>
-            {unit.payments.map((p) => <tr key={p.id}><td>{date(p.paidAt)}</td><td>{PAYMENT_METHODS[p.method]}</td><td className="text-right text-green-700">{money(p.amount)}</td><td className="text-right"><Link href={`/finance/receipt/${p.id}`} className="text-xs text-brand-600 hover:underline">Разписка</Link></td></tr>)}
+            {unit.payments.map((p) => <tr key={p.id}><td>{date(p.paidAt)}</td><td>{PAYMENT_METHODS[p.method]}</td><td className="text-right text-green-700">{money(p.amountCents)}</td><td className="text-right"><Link href={`/finance/receipt/${p.id}`} className="text-xs text-brand-600 hover:underline">Разписка</Link></td></tr>)}
             {unit.payments.length === 0 && <tr><td className="text-slate-400">Няма</td></tr>}
           </tbody></table>
         </Card>

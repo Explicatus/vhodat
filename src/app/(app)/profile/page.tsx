@@ -1,11 +1,11 @@
 import { requireMembership } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
-import { updateProfile } from "../notifications/actions";
+import { logoutEverywhere, resendVerification, updateProfile } from "../notifications/actions";
 
-export default async function Profile({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+export default async function Profile({ searchParams }: { searchParams: Promise<{ saved?: string; sent?: string }> }) {
   const { user } = await requireMembership();
-  const { saved } = await searchParams;
+  const { saved, sent } = await searchParams;
   return (
     <>
       <PageHeader title="Моят профил" subtitle={user.email} />
@@ -34,6 +34,21 @@ export default async function Profile({ searchParams }: { searchParams: Promise<
         </Card>
         <div className="lg:col-span-2"><SubmitButton>Запази</SubmitButton></div>
       </form>
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card title="📧 Имейл">
+          {user.emailVerifiedAt ? <p className="text-sm text-green-700">✅ Имейлът {user.email} е потвърден.</p> : (
+            <>
+              <p className="text-sm text-amber-700">Имейлът {user.email} не е потвърден.</p>
+              {sent && <p className="mt-1 text-xs text-slate-500">Изпратихме нов линк (ако не сме пратили такъв през последната минута).</p>}
+              <form action={resendVerification} className="mt-3"><SubmitButton className="btn-secondary btn-sm">Изпрати линка отново</SubmitButton></form>
+            </>
+          )}
+        </Card>
+        <Card title="🔐 Сигурност">
+          <p className="text-sm text-slate-500">Изгубен телефон или вход от чужд компютър? Излезте от всички устройства наведнъж.</p>
+          <form action={logoutEverywhere} className="mt-3"><SubmitButton className="btn-secondary btn-sm" confirm="Изход от всички устройства, включително това?">Изход от всички устройства</SubmitButton></form>
+        </Card>
+      </div>
     </>
   );
 }

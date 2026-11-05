@@ -20,7 +20,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             </>
           )}
           <label className="block"><span className="label">Имейл</span><input name="email" type="email" required className="input" /></label>
-          <label className="block"><span className="label">Парола</span><input name="password" type="password" required className="input" /></label>
+          <label className="block"><span className="label">Парола</span><input name="password" type="password" required minLength={mode === "register" ? 8 : undefined} autoComplete={mode === "login" ? "current-password" : "new-password"} className="input" /></label>
+          {mode === "login" && <div className="-mt-2 text-right"><Link href="/forgot" className="text-xs text-brand-600 hover:underline">Забравена парола?</Link></div>}
           <SubmitButton className="btn-primary w-full">{mode === "login" ? "Вход" : "Регистрация"}</SubmitButton>
           <p className="text-center text-sm text-slate-500">
             {mode === "login" ? (

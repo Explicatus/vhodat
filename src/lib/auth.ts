@@ -17,7 +17,8 @@ export async function verifyPassword(pw: string, hash: string) {
 }
 
 export async function createSession(userId: string) {
-  const token = await new SignJWT({ sub: userId })
+  const u = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { sessionVersion: true } });
+  const token = await new SignJWT({ sub: userId, sv: u.sessionVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
@@ -43,7 +44,10 @@ export async function getCurrentUser() {
   try {
     const { payload } = await jwtVerify(token, secret());
     if (!payload.sub) return null;
-    return db.user.findUnique({ where: { id: payload.sub } });
+    const user = await db.user.findUnique({ where: { id: payload.sub } });
+    // сесия, издадена преди смяна на паролата / изход от всички устройства, е невалидна
+    if (!user || (payload.sv ?? 0) !== user.sessionVersion) return null;
+    return user;
   } catch {
     return null;
   }

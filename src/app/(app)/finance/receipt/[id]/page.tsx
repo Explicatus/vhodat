@@ -30,7 +30,7 @@ export default async function Receipt({ params }: { params: Promise<{ id: string
             <tr><td>Платец</td><td className="text-right">{p.unit.ownerName ?? "—"}</td></tr>
             <tr><td>Начин на плащане</td><td className="text-right">{PAYMENT_METHODS[p.method]}</td></tr>
             {p.note && <tr><td>Основание</td><td className="text-right">{p.note}</td></tr>}
-            <tr className="text-lg font-bold"><td>Сума</td><td className="text-right">{money(p.amount)}</td></tr>
+            <tr className="text-lg font-bold"><td>Сума</td><td className="text-right">{money(p.amountCents)}</td></tr>
           </tbody>
         </table>
         <div className="flex justify-between pt-8 text-xs text-slate-500"><span>Получил: ................</span><span>Платил: ................</span></div>

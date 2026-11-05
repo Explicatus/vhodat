@@ -11,7 +11,7 @@ export default async function Units() {
   const { building } = await requireManager();
   const rows = await unitBalances(building.id);
   const totals = rows.reduce(
-    (a, r) => ({ residents: a.residents + r.unit.residents, fee: a.fee + r.unit.monthlyFee, ideal: a.ideal + r.unit.idealParts }),
+    (a, r) => ({ residents: a.residents + r.unit.residents, fee: a.fee + r.unit.monthlyFeeCents, ideal: a.ideal + r.unit.idealParts }),
     { residents: 0, fee: 0, ideal: 0 },
   );
   return (
@@ -31,7 +31,7 @@ export default async function Units() {
                     <td>{u.ownerName ?? "—"}</td>
                     <td>{u.residents}</td>
                     <td>{u.idealParts ? `${u.idealParts}%` : "—"}</td>
-                    <td className="text-right">{money(u.monthlyFee)}</td>
+                    <td className="text-right">{money(u.monthlyFeeCents)}</td>
                     <td className={`text-right font-medium ${balance > 0 ? "text-red-600" : "text-green-600"}`}>{money(balance)}</td>
                   </tr>
                 ))}

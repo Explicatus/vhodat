@@ -6,6 +6,7 @@ import { CHARGE_TYPES, date, money, PAYMENT_METHODS, periodLabel } from "@/lib/f
 import { Card, PageHeader, Stat } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { deleteUnit, updateUnit } from "../actions";
+import { addUnitCharge, deleteCharge } from "../../finance/actions";
 import { UnitFields } from "../UnitFields";
 
 export default async function UnitPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,9 +21,9 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
     },
   });
   if (!unit) notFound();
-  const charged = unit.charges.reduce((s, c) => s + c.amount, 0);
-  const paid = unit.payments.reduce((s, p) => s + p.amount, 0);
-  const balance = Math.round((charged - paid) * 100) / 100;
+  const charged = unit.charges.reduce((s, c) => s + c.amountCents, 0);
+  const paid = unit.payments.reduce((s, p) => s + p.amountCents, 0);
+  const balance = charged - paid;
 
   return (
     <>
@@ -37,17 +38,22 @@ export default async function UnitPage({ params }: { params: Promise<{ id: strin
           <table className="table">
             <tbody>
               {unit.charges.map((c) => (
-                <tr key={c.id}><td>{periodLabel(c.period)}</td><td>{c.description || CHARGE_TYPES[c.type]}</td><td className="text-right">{money(c.amount)}</td></tr>
+                <tr key={c.id}><td>{periodLabel(c.period)}</td><td>{c.description || CHARGE_TYPES[c.type]}</td><td className="text-right">{money(c.amountCents)}</td><td className="w-8 text-right"><form action={deleteCharge.bind(null, c.id)}><SubmitButton className="btn-secondary btn-sm" confirm="Изтриване на това начисление?">✕</SubmitButton></form></td></tr>
               ))}
               {unit.charges.length === 0 && <tr><td className="text-slate-400">Няма</td></tr>}
             </tbody>
           </table>
+          <form action={addUnitCharge.bind(null, unit.id)} className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-500/10 pt-4">
+            <label className="min-w-0 flex-1"><span className="label">Ново задължение</span><input name="description" required placeholder="Корекция / индивидуална такса" className="input" /></label>
+            <label className="w-28"><span className="label">Сума (€)</span><input name="amount" inputMode="decimal" required className="input" /></label>
+            <SubmitButton className="btn-secondary">Добави</SubmitButton>
+          </form>
         </Card>
         <Card title="Плащания">
           <table className="table">
             <tbody>
               {unit.payments.map((p) => (
-                <tr key={p.id}><td>{date(p.paidAt)}</td><td>{PAYMENT_METHODS[p.method]}{p.note ? ` · ${p.note}` : ""}</td><td className="text-right text-green-700">{money(p.amount)}</td></tr>
+                <tr key={p.id}><td>{date(p.paidAt)}</td><td>{PAYMENT_METHODS[p.method]}{p.note ? ` · ${p.note}` : ""}</td><td className="text-right text-green-700">{money(p.amountCents)}</td></tr>
               ))}
               {unit.payments.length === 0 && <tr><td className="text-slate-400">Няма</td></tr>}
             </tbody>

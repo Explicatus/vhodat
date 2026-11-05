@@ -87,7 +87,11 @@ export default async function Dashboard() {
         )}
         {!isManager && !membership.unitId && (
           <Card title="Свържете обект" className="lg:col-span-2">
-            <p className="text-sm text-slate-600">Здравейте, {user.name}! Помолете домоуправителя да свърже профила ви с вашия апартамент, за да виждате задълженията си и да гласувате.</p>
+            <p className="text-sm text-slate-600">
+              {membership.requestedUnitId
+                ? <>⏳ Заявката ви за свързване с обект чака одобрение от управителя. Ще получите известие, щом бъде одобрена.</>
+                : <>Здравейте, {user.name}! Помолете домоуправителя да свърже профила ви с вашия апартамент, за да виждате задълженията си и да гласувате.</>}
+            </p>
           </Card>
         )}
       </div>

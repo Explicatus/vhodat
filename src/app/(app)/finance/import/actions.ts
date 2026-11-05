@@ -23,7 +23,8 @@ export async function uploadStatement(form: FormData) {
     const exists = await db.bankTxn.findUnique({ where: { buildingId_hash: { buildingId: building.id, hash: t.hash } } });
     if (exists) continue;
     const m = matchUnit(t, units);
-    await db.bankTxn.create({ data: { buildingId: building.id, ...t, suggestedUnitId: m?.unitId, confidence: m?.confidence } });
+    const { amount, ...rest } = t;
+    await db.bankTxn.create({ data: { buildingId: building.id, ...rest, amountCents: Math.round(amount * 100), suggestedUnitId: m?.unitId, confidence: m?.confidence } });
     added++;
   }
   redirect(`/finance/import?added=${added}&total=${txns.length}`);
@@ -39,9 +40,9 @@ export async function confirmTxns(form: FormData) {
     const t = await db.bankTxn.findFirst({ where: { id, buildingId: building.id, status: "NEW" } });
     const unit = unitId ? await db.unit.findFirst({ where: { id: unitId, buildingId: building.id } }) : null;
     if (!t || !unit) continue;
-    const p = await db.payment.create({ data: { unitId: unit.id, amount: t.amount, method: "BANK", paidAt: t.date, note: t.reason.slice(0, 120) || "Банков превод" } });
+    const p = await db.payment.create({ data: { unitId: unit.id, amountCents: t.amountCents, method: "BANK", paidAt: t.date, note: t.reason.slice(0, 120) || "Банков превод" } });
     await db.bankTxn.update({ where: { id }, data: { status: "IMPORTED", paymentId: p.id } });
-    await notify({ buildingId: building.id, unitIds: [unit.id] }, { title: "Получено плащане", body: `Банков превод от ${money(t.amount)} за обект ${unit.number} е отразен.`, link: "/finance" });
+    await notify({ buildingId: building.id, unitIds: [unit.id] }, { title: "Получено плащане", body: `Банков превод от ${money(t.amountCents)} за обект ${unit.number} е отразен.`, link: "/finance" });
     n++;
   }
   revalidatePath("/finance");

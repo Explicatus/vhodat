@@ -2,7 +2,6 @@ import "server-only";
 import Stripe from "stripe";
 import { headers } from "next/headers";
 import { db } from "./db";
-import { round } from "./finance";
 import { notify } from "./notify";
 
 let _stripe: Stripe | null = null;
@@ -16,8 +15,9 @@ export const stripeConfigured = () => !!process.env.STRIPE_SECRET_KEY;
 export const mockMode = () => !stripeConfigured() && process.env.PAYMENTS_MOCK === "1";
 export const platformFeePercent = () => Math.max(0, parseFloat(process.env.PLATFORM_FEE_PERCENT || "0") || 0);
 
-export const MIN_ONLINE = 1;
-export const MAX_ONLINE = 10000;
+/** Граници за онлайн плащане, в центове (1 € – 10 000 €). */
+export const MIN_ONLINE = 100;
+export const MAX_ONLINE = 1_000_000;
 
 export async function appUrl() {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
@@ -32,34 +32,36 @@ export function onlineEnabled(b: { stripeAccountId: string | null; stripeCharges
 
 /**
  * Отбелязва онлайн плащане като платено и създава запис в касата.
- * Идемпотентно — безопасно е да се извика многократно (webhook + връщане от Stripe).
+ * Идемпотентно и безопасно при паралелни извиквания (webhook + връщане от Stripe):
+ * условният преход PENDING → PAID е атомарен, така че само едно извикване
+ * „печели“ и създава плащането.
  */
 export async function markOnlinePaid(onlinePaymentId: string, providerRef?: string) {
-  let fresh = false;
-  const res = await db.$transaction(async (tx) => {
-    const op = await tx.onlinePayment.findUnique({ where: { id: onlinePaymentId } });
-    if (!op || op.status === "PAID") return op;
-    fresh = true;
+  const won = await db.$transaction(async (tx) => {
+    const claimed = await tx.onlinePayment.updateMany({
+      where: { id: onlinePaymentId, status: { in: ["PENDING", "CANCELED"] } },
+      data: { status: "PAID", paidAt: new Date(), ...(providerRef ? { providerRef } : {}) },
+    });
+    if (claimed.count === 0) return null; // вече е платено от друго извикване
+    const op = await tx.onlinePayment.findUniqueOrThrow({ where: { id: onlinePaymentId } });
     const payment = await tx.payment.create({
-      data: { unitId: op.unitId, amount: op.amount, method: "CARD", note: "Онлайн плащане с карта", paidAt: new Date() },
+      data: { unitId: op.unitId, amountCents: op.amountCents, method: "CARD", note: "Онлайн плащане с карта", paidAt: new Date() },
     });
-    return tx.onlinePayment.update({
-      where: { id: op.id },
-      data: { status: "PAID", paidAt: new Date(), paymentId: payment.id, providerRef: providerRef ?? op.providerRef },
-    });
+    return tx.onlinePayment.update({ where: { id: op.id }, data: { paymentId: payment.id } });
   });
-  if (fresh && res) {
-    const unit = await db.unit.findUnique({ where: { id: res.unitId } });
-    const amt = new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR" }).format(res.amount);
-    await notify({ buildingId: res.buildingId, unitIds: [res.unitId] }, { title: "Плащането е успешно", body: `Получихме ${amt} с карта за обект ${unit?.number}.`, link: "/finance" });
-    await notify({ buildingId: res.buildingId, roles: ["MANAGER"] }, { title: "💳 Онлайн плащане", body: `Обект ${unit?.number} плати ${amt} с карта.`, link: "/finance" });
+  if (won) {
+    const unit = await db.unit.findUnique({ where: { id: won.unitId } });
+    const amt = new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR" }).format(won.amountCents / 100);
+    await notify({ buildingId: won.buildingId, unitIds: [won.unitId] }, { title: "Плащането е успешно", body: `Получихме ${amt} с карта за обект ${unit?.number}.`, link: "/finance" });
+    await notify({ buildingId: won.buildingId, roles: ["MANAGER"] }, { title: "💳 Онлайн плащане", body: `Обект ${unit?.number} плати ${amt} с карта.`, link: "/finance" });
+    return won;
   }
-  return res;
+  return db.onlinePayment.findUnique({ where: { id: onlinePaymentId } });
 }
 
 /** Създава Stripe Checkout сесия (destination charge към сметката на ЕС). Връща URL за пренасочване. */
 export async function createStripeCheckout(opts: {
-  onlinePaymentId: string; amount: number; fee: number; destination: string;
+  onlinePaymentId: string; amountCents: number; feeCents: number; destination: string;
   buildingName: string; unitNumber: string; email: string;
 }) {
   const base = await appUrl();
@@ -71,12 +73,12 @@ export async function createStripeCheckout(opts: {
       quantity: 1,
       price_data: {
         currency: "eur",
-        unit_amount: Math.round(opts.amount * 100),
+        unit_amount: opts.amountCents,
         product_data: { name: `Такси — обект ${opts.unitNumber}`, description: opts.buildingName },
       },
     }],
     payment_intent_data: {
-      application_fee_amount: Math.round(opts.fee * 100) || undefined,
+      application_fee_amount: opts.feeCents || undefined,
       transfer_data: { destination: opts.destination },
       on_behalf_of: opts.destination,
       metadata: { onlinePaymentId: opts.onlinePaymentId },
@@ -98,4 +100,4 @@ export async function syncStripeSession(onlinePaymentId: string) {
   return op;
 }
 
-export const feeFor = (amount: number) => round((amount * platformFeePercent()) / 100);
+export const feeFor = (amountCents: number) => Math.round((amountCents * platformFeePercent()) / 100);

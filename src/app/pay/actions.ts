@@ -3,27 +3,26 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireMembership } from "@/lib/auth";
 import { createStripeCheckout, feeFor, markOnlinePaid, MAX_ONLINE, MIN_ONLINE, mockMode, onlineEnabled } from "@/lib/payments";
-import { round } from "@/lib/finance";
-import { num } from "@/lib/util";
+import { cents } from "@/lib/util";
 
 /** Собственик стартира плащане с карта за своя обект. */
 export async function startCardPayment(form: FormData) {
   const { user, building, membership } = await requireMembership();
   if (!membership.unitId) redirect("/finance");
   if (!onlineEnabled(building)) redirect("/finance?pay=disabled");
-  const amount = round(num(form, "amount"));
-  if (amount < MIN_ONLINE || amount > MAX_ONLINE) redirect("/finance?pay=amount");
+  const amountCents = cents(form, "amount");
+  if (amountCents < MIN_ONLINE || amountCents > MAX_ONLINE) redirect("/finance?pay=amount");
   const unit = await db.unit.findFirst({ where: { id: membership.unitId, buildingId: building.id } });
   if (!unit) redirect("/finance");
 
   const mock = mockMode();
   const op = await db.onlinePayment.create({
-    data: { buildingId: building.id, unitId: unit.id, userId: user.id, amount, platformFee: feeFor(amount), provider: mock ? "mock" : "stripe" },
+    data: { buildingId: building.id, unitId: unit.id, userId: user.id, amountCents, platformFeeCents: feeFor(amountCents), provider: mock ? "mock" : "stripe" },
   });
   if (mock) redirect(`/pay/mock/${op.id}`);
 
   const url = await createStripeCheckout({
-    onlinePaymentId: op.id, amount, fee: op.platformFee, destination: building.stripeAccountId!,
+    onlinePaymentId: op.id, amountCents, feeCents: op.platformFeeCents, destination: building.stripeAccountId!,
     buildingName: building.name, unitNumber: unit.number, email: user.email,
   });
   redirect(url);

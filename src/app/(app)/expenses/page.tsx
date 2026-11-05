@@ -9,8 +9,8 @@ export default async function Expenses() {
   const { building, isManager } = await requireMembership();
   const expenses = await db.expense.findMany({ where: { buildingId: building.id }, orderBy: { date: "desc" } });
   const byCat = new Map<string, number>();
-  for (const e of expenses) byCat.set(e.category, (byCat.get(e.category) ?? 0) + e.amount);
-  const total = expenses.reduce((s, e) => s + e.amount, 0);
+  for (const e of expenses) byCat.set(e.category, (byCat.get(e.category) ?? 0) + e.amountCents);
+  const total = expenses.reduce((s, e) => s + e.amountCents, 0);
   const cats = [...byCat.entries()].sort((a, b) => b[1] - a[1]);
 
   return (
@@ -28,7 +28,7 @@ export default async function Expenses() {
                       <td className="whitespace-nowrap">{date(e.date)}</td>
                       <td>{e.description}{e.vendor && <div className="text-xs text-slate-400">{e.vendor}</div>}</td>
                       <td className="text-xs">{EXPENSE_CATEGORIES[e.category] ?? e.category}</td>
-                      <td className="text-right font-medium">{money(e.amount)}</td>
+                      <td className="text-right font-medium">{money(e.amountCents)}</td>
                       {isManager && <td className="text-right"><form action={deleteExpense.bind(null, e.id)}><SubmitButton className="btn-secondary btn-sm" confirm="Изтриване на разхода?">✕</SubmitButton></form></td>}
                     </tr>
                   ))}

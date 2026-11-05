@@ -54,7 +54,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
       <main className="flex-1 px-3 pb-10 pt-2 md:p-8">
-        <div className="mx-auto max-w-6xl">{children}</div>
+        <div className="mx-auto max-w-6xl">
+          {!user.emailVerifiedAt && (
+            <div className="glass mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-2.5 text-sm">
+              <span>📧 Потвърдете имейла си ({user.email}) — пратихме ви линк.</span>
+              <Link href="/profile" className="text-brand-600 hover:underline">Изпрати отново</Link>
+            </div>
+          )}
+          {children}
+        </div>
         <div className="mt-8 flex gap-4 text-xs md:hidden"><Link href="/profile" className="text-brand-600">Профил</Link><form action={logout}><button className="text-red-600">Изход ({user.email})</button></form></div>
       </main>
     </div>

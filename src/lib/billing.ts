@@ -3,7 +3,8 @@ import { db } from "./db";
 import { appUrl, mockMode, stripe } from "./payments";
 
 export const FREE_UNIT_LIMIT = 10;
-export const PRO_PRICE_PER_UNIT = 0.5;
+/** Цена на обект на месец, в центове. */
+export const PRO_PRICE_PER_UNIT = 50;
 
 type B = { id: string; plan: string; subscriptionStatus: string | null };
 export const isPro = (b: B) => b.plan === "PRO" && ["active", "trialing", "past_due"].includes(b.subscriptionStatus ?? "");

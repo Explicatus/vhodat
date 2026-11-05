@@ -34,3 +34,18 @@ export async function updateProfile(form: FormData) {
   revalidatePath("/profile");
   redirect("/profile?saved=1");
 }
+
+export async function resendVerification() {
+  const user = await requireUser();
+  const { recentlySent } = await import("@/lib/tokens");
+  const { sendVerification } = await import("@/lib/verify");
+  if (!user.emailVerifiedAt && !(await recentlySent(user.id, "VERIFY"))) await sendVerification(user.id, user.email);
+  redirect("/profile?sent=1");
+}
+
+/** Прекратява всички сесии на потребителя (включително текущата). */
+export async function logoutEverywhere() {
+  const user = await requireUser();
+  await db.user.update({ where: { id: user.id }, data: { sessionVersion: { increment: 1 } } });
+  redirect("/login");
+}

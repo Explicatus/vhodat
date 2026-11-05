@@ -8,3 +8,5 @@ export const randomCode = (len = 8) => {
   const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: len }, () => a[Math.floor(Math.random() * a.length)]).join("");
 };
+/** Сума в евро от форма → евроцентове. */
+export const cents = (f: FormData, k: string) => Math.round(num(f, k) * 100);

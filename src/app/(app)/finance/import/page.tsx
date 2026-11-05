@@ -53,7 +53,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
                         <td><input type="checkbox" name="txn" value={t.id} defaultChecked={!!t.suggestedUnitId} className="h-4 w-4 accent-brand-600" /></td>
                         <td className="whitespace-nowrap">{date(t.date)}</td>
                         <td><div className="font-medium">{t.counterparty ?? "—"}</div><div className="text-xs text-slate-500">{t.reason}</div></td>
-                        <td className="text-right font-medium text-green-700">{money(t.amount)}</td>
+                        <td className="text-right font-medium text-green-700">{money(t.amountCents)}</td>
                         <td>
                           <select name={`unit_${t.id}`} defaultValue={t.suggestedUnitId ?? ""} className="input w-40 text-xs">
                             <option value="">— изберете —</option>

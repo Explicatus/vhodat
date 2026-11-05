@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { unitBalances } from "@/lib/finance";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/lib/format";
 
+/** Центове → „12,50“ (формат за Excel на български). */
+const eur = (c: number) => (c / 100).toFixed(2).replace(".", ",");
 const csv = (rows: (string | number | null)[][]) =>
   "﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
 
@@ -21,15 +23,15 @@ export async function GET(_: Request, { params }: { params: Promise<{ kind: stri
   if (kind === "balances") {
     const rows = await unitBalances(m.buildingId);
     body = csv([["Обект", "Собственик", "Живущи", "Месечна такса", "Начислено", "Платено", "Салдо"],
-      ...rows.map((r) => [r.unit.number, r.unit.ownerName, r.unit.residents, r.unit.monthlyFee, r.charged, r.paid, r.balance])]);
+      ...rows.map((r) => [r.unit.number, r.unit.ownerName, r.unit.residents, eur(r.unit.monthlyFeeCents), eur(r.charged), eur(r.paid), eur(r.balance)])]);
   } else if (kind === "payments") {
     const rows = await db.payment.findMany({ where: { unit: { buildingId: m.buildingId } }, include: { unit: true }, orderBy: { paidAt: "asc" } });
     body = csv([["Дата", "Обект", "Сума", "Начин", "Бележка"],
-      ...rows.map((p) => [p.paidAt.toISOString().slice(0, 10), p.unit.number, p.amount, PAYMENT_METHODS[p.method], p.note])]);
+      ...rows.map((p) => [p.paidAt.toISOString().slice(0, 10), p.unit.number, eur(p.amountCents), PAYMENT_METHODS[p.method], p.note])]);
   } else if (kind === "expenses") {
     const rows = await db.expense.findMany({ where: { buildingId: m.buildingId }, orderBy: { date: "asc" } });
     body = csv([["Дата", "Категория", "Описание", "Доставчик", "Сума"],
-      ...rows.map((e) => [e.date.toISOString().slice(0, 10), EXPENSE_CATEGORIES[e.category] ?? e.category, e.description, e.vendor, e.amount])]);
+      ...rows.map((e) => [e.date.toISOString().slice(0, 10), EXPENSE_CATEGORIES[e.category] ?? e.category, e.description, e.vendor, eur(e.amountCents)])]);
   } else return new NextResponse("Not found", { status: 404 });
 
   return new NextResponse(body, {

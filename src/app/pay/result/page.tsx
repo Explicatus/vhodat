@@ -20,7 +20,7 @@ export default async function PayResult({ searchParams }: { searchParams: Promis
         <h1 className="mt-3 text-xl font-bold">
           {paid ? "Плащането е успешно" : pending ? "Плащането се обработва" : "Плащането е отказано"}
         </h1>
-        {op && <p className="mt-2 text-slate-600">{money(op.amount)}</p>}
+        {op && <p className="mt-2 text-slate-600">{money(op.amountCents)}</p>}
         <p className="mt-2 text-sm text-slate-500">
           {paid ? "Сумата е отразена в сметката на вашия обект." : pending ? "Ще бъде отразено до минута. Може да затворите страницата." : "Не е изтеглена сума от картата ви."}
         </p>

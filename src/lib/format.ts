@@ -1,5 +1,25 @@
-export const money = (n: number) =>
-  new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR" }).format(n);
+/** Всички суми в базата са в евроцентове (цели числа) — без грешки от закръгляне. */
+export const money = (cents: number) =>
+  new Intl.NumberFormat("bg-BG", { style: "currency", currency: "EUR" }).format(cents / 100);
+/** Евро (от форма) → центове. */
+export const toCents = (euros: number) => Math.round(euros * 100);
+/** Центове → „12.50“ за поле във форма. */
+export const euroInput = (cents: number) => (cents / 100).toFixed(2);
+
+/**
+ * Разпределя сума в центове пропорционално на теглата така,
+ * че сборът да е точно равен на total (метод на най-големия остатък).
+ */
+export function allocate(totalCents: number, weights: number[]) {
+  const sum = weights.reduce((a, b) => a + b, 0);
+  if (!sum) return weights.map(() => 0);
+  const raw = weights.map((w) => (totalCents * w) / sum);
+  const out = raw.map(Math.floor);
+  let rest = totalCents - out.reduce((a, b) => a + b, 0);
+  const order = raw.map((r, i) => [r - Math.floor(r), i] as const).sort((a, b) => b[0] - a[0]);
+  for (let k = 0; rest > 0; k = (k + 1) % order.length, rest--) out[order[k][1]]++;
+  return out;
+}
 
 export const date = (d: Date | string) =>
   new Intl.DateTimeFormat("bg-BG", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(d));

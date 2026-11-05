@@ -3,16 +3,16 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireManager } from "@/lib/auth";
 import { CHARGE_TYPES, periodLabel } from "@/lib/format";
-import { num, optStr, str } from "@/lib/util";
+import { cents, optStr, str } from "@/lib/util";
 import { notify } from "@/lib/notify";
-import { money } from "@/lib/format";
+import { allocate, money } from "@/lib/format";
 import { unitBalances } from "@/lib/finance";
 
 /** Начислява месечните такси за период на всички обекти (без дублиране). */
 export async function generateMonthly(form: FormData) {
   const { building } = await requireManager();
   const period = str(form, "period"); // YYYY-MM
-  const repairPerUnit = num(form, "repairFund");
+  const repairPerUnit = cents(form, "repairFund");
   if (!/^\d{4}-\d{2}$/.test(period)) return;
   const [y, m] = period.split("-").map(Number);
   const dueDate = new Date(y, m - 1, 25);
@@ -24,10 +24,10 @@ export async function generateMonthly(form: FormData) {
   const has = new Set(existing.map((e) => `${e.unitId}:${e.type}`));
   const data = [];
   for (const u of units) {
-    if (u.monthlyFee > 0 && !has.has(`${u.id}:MONTHLY`))
-      data.push({ unitId: u.id, period, type: "MONTHLY", description: `${CHARGE_TYPES.MONTHLY} — ${periodLabel(period)}`, amount: u.monthlyFee, dueDate });
+    if (u.monthlyFeeCents > 0 && !has.has(`${u.id}:MONTHLY`))
+      data.push({ unitId: u.id, period, type: "MONTHLY", description: `${CHARGE_TYPES.MONTHLY} — ${periodLabel(period)}`, amountCents: u.monthlyFeeCents, dueDate });
     if (repairPerUnit > 0 && !has.has(`${u.id}:REPAIR_FUND`))
-      data.push({ unitId: u.id, period, type: "REPAIR_FUND", description: `${CHARGE_TYPES.REPAIR_FUND} — ${periodLabel(period)}`, amount: repairPerUnit, dueDate });
+      data.push({ unitId: u.id, period, type: "REPAIR_FUND", description: `${CHARGE_TYPES.REPAIR_FUND} — ${periodLabel(period)}`, amountCents: repairPerUnit, dueDate });
   }
   if (data.length) {
     await db.charge.createMany({ data });
@@ -40,18 +40,20 @@ export async function generateMonthly(form: FormData) {
 export async function oneTimeCharge(form: FormData) {
   const { building } = await requireManager();
   const description = str(form, "description");
-  const total = num(form, "total");
+  const total = cents(form, "total");
   const basis = str(form, "basis"); // perUnit | idealParts
   if (!description || total <= 0) return;
   const units = await db.unit.findMany({ where: { buildingId: building.id } });
   const sumIdeal = units.reduce((s, u) => s + u.idealParts, 0);
+  // точно разпределение: сборът по обекти е равен на общата сума до цент
+  const shares = basis === "idealParts" && sumIdeal > 0 ? allocate(total, units.map((u) => u.idealParts)) : units.map(() => total);
   const now = new Date();
   const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const dueDate = new Date(now.getTime() + 30 * 864e5);
   await db.charge.createMany({
-    data: units.map((u) => ({
+    data: units.map((u, i) => ({
       unitId: u.id, period, type: "ONE_TIME", description, dueDate,
-      amount: basis === "idealParts" && sumIdeal > 0 ? Math.round((total * u.idealParts / sumIdeal) * 100) / 100 : total,
+      amountCents: shares[i],
     })),
   });
   await notify({ buildingId: building.id, roles: ["RESIDENT"] }, { title: `Нова вноска: ${description}`, body: `Начислена е еднократна вноска „${description}“. Проверете сумата за вашия обект.`, link: "/finance" });
@@ -61,14 +63,14 @@ export async function oneTimeCharge(form: FormData) {
 export async function recordPayment(form: FormData) {
   const { building } = await requireManager();
   const unitId = str(form, "unitId");
-  const amount = num(form, "amount");
+  const amountCents = cents(form, "amount");
   const unit = await db.unit.findFirst({ where: { id: unitId, buildingId: building.id } });
-  if (!unit || amount <= 0) return;
+  if (!unit || amountCents <= 0) return;
   const d = str(form, "paidAt");
   await db.payment.create({
-    data: { unitId, amount, method: str(form, "method") || "CASH", note: optStr(form, "note"), paidAt: d ? new Date(d) : new Date() },
+    data: { unitId, amountCents, method: str(form, "method") || "CASH", note: optStr(form, "note"), paidAt: d ? new Date(d) : new Date() },
   });
-  await notify({ buildingId: building.id, unitIds: [unitId] }, { title: "Получено плащане", body: `Регистрирано е плащане от ${money(amount)} за обект ${unit.number}. Благодарим!`, link: "/finance" });
+  await notify({ buildingId: building.id, unitIds: [unitId] }, { title: "Получено плащане", body: `Регистрирано е плащане от ${money(amountCents)} за обект ${unit.number}. Благодарим!`, link: "/finance" });
   revalidatePath("/finance");
 }
 
@@ -92,4 +94,46 @@ export async function remindDebtors() {
   }
   const { redirect } = await import("next/navigation");
   redirect(`/finance?reminded=${sent}`);
+}
+
+/** Изтрива едно грешно начисление. */
+export async function deleteCharge(id: string) {
+  const { building } = await requireManager();
+  const c = await db.charge.findFirst({ where: { id, unit: { buildingId: building.id } } });
+  if (!c) return;
+  await db.charge.delete({ where: { id } });
+  revalidatePath(`/units/${c.unitId}`);
+  revalidatePath("/finance");
+}
+
+/** Сторнира цяло начисление (напр. сгрешена еднократна вноска към всички обекти). */
+export async function reverseChargeBatch(period: string, type: string, description: string) {
+  const { building } = await requireManager();
+  const { count } = await db.charge.deleteMany({ where: { period, type, description, unit: { buildingId: building.id } } });
+  if (count) {
+    await notify({ buildingId: building.id, roles: ["RESIDENT"] }, {
+      title: "Сторнирано начисление",
+      body: `Начислението „${description}“ е сторнирано от управителя. Салдото ви е коригирано.`,
+      link: "/finance",
+    });
+  }
+  revalidatePath("/finance");
+}
+
+/** Добавя задължение към един обект (корекция, индивидуална такса). */
+export async function addUnitCharge(unitId: string, form: FormData) {
+  const { building } = await requireManager();
+  const unit = await db.unit.findFirst({ where: { id: unitId, buildingId: building.id } });
+  const amountCents = cents(form, "amount");
+  const description = str(form, "description");
+  if (!unit || amountCents <= 0 || !description) return;
+  const now = new Date();
+  await db.charge.create({
+    data: {
+      unitId, amountCents, description, type: "ONE_TIME",
+      period: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+      dueDate: new Date(now.getTime() + 30 * 864e5),
+    },
+  });
+  revalidatePath(`/units/${unitId}`);
 }
