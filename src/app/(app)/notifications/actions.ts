@@ -95,3 +95,12 @@ export async function deleteAccount(_: DeleteState, form: FormData): Promise<Del
   await destroySession();
   redirect("/?deleted=1");
 }
+
+/** Размер на текста за това устройство. */
+export async function setTextSize(size: "normal" | "lg") {
+  const { cookies } = await import("next/headers");
+  const c = await cookies();
+  if (size === "lg") c.set("es_text", "lg", { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  else c.delete("es_text");
+  revalidatePath("/", "layout");
+}

@@ -102,8 +102,8 @@ test("устройства: списък, изход от друго устро�
   const [a, b, c] = [await newPage(browser), await newPage(browser), await newPage(browser)];
   for (const p of [a, b, c]) await login(p, "manager@demo.bg");
   await a.goto("/profile");
-  await expect(a.getByText("това устройство")).toBeVisible();
-  const others = a.locator("li", { hasText: "последно:" }).filter({ hasNot: a.getByText("това устройство") });
+  await expect(a.getByText("това устройство", { exact: true })).toBeVisible();
+  const others = a.locator("li", { hasText: "последно:" }).filter({ hasNot: a.getByText("това устройство", { exact: true }) });
   expect(await others.count()).toBeGreaterThanOrEqual(2);
   await others.first().getByRole("button", { name: "Изход" }).click();
   await expect.poll(async () => {

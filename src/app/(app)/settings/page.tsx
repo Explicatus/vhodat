@@ -124,11 +124,11 @@ export default async function Settings() {
                     </td>
                     <td>
                       <form action={updateMember.bind(null, m.id)} className="flex gap-2">
-                        <select name="role" defaultValue={m.role} className="input w-36 text-xs" disabled={m.id === me.id}>
+                        <select name="role" aria-label={`Роля на ${m.user.name}`} defaultValue={m.role} className="input w-36 text-xs" disabled={m.id === me.id}>
                           <option value="RESIDENT">Обитател</option>
                           <option value="MANAGER">Управител</option>
                         </select>
-                        <select name="addUnitId" defaultValue="" className="input w-40 text-xs">
+                        <select name="addUnitId" aria-label={`Добави обект към ${m.user.name}`} defaultValue="" className="input w-40 text-xs">
                           <option value="">+ добави обект</option>
                           {units.filter((u) => !m.units.some((mu) => mu.unitId === u.id)).map((u) => <option key={u.id} value={u.id}>{u.number} {u.ownerName ? `· ${u.ownerName}` : ""}</option>)}
                         </select>
