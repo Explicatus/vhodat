@@ -1,9 +1,10 @@
-# Локален продукционен стек: PostgreSQL + приложението.
-# Преди старт: в prisma/schema.prisma сменете provider = "postgresql".
+# Локален стек: PostgreSQL + приложението.
+# Само база за разработка: `docker compose up -d db`
 services:
   db:
     image: postgres:16-alpine
     environment: { POSTGRES_USER: vhodat, POSTGRES_PASSWORD: vhodat, POSTGRES_DB: vhodat }
+    ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
   app:
     build: .

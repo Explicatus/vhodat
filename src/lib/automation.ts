@@ -3,13 +3,9 @@ import { db } from "./db";
 import { audit } from "./audit";
 import { generateMonthlyCharges, remindDebtorsFor } from "./charges";
 import { periodLabel } from "./format";
+import { sofiaToday } from "./dates";
 
-/** Днешната дата в България (сървърът може да е в друга часова зона). */
-export function sofiaToday(now = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
-  const get = (t: string) => parts.find((p) => p.type === t)!.value;
-  return { period: `${get("year")}-${get("month")}`, day: Number(get("day")) };
-}
+export { sofiaToday };
 
 /**
  * Изпълнява се веднъж дневно (cron). За всяка ЕС с включена автоматизация:

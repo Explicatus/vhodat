@@ -1,7 +1,8 @@
 import { requireMembership } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
-import { logoutEverywhere, resendVerification, revokeSession, updateProfile } from "../notifications/actions";
+import { logoutEverywhere, resendVerification, revokeSession, setTextSize, updateProfile } from "../notifications/actions";
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { DeleteAccount } from "./DeleteAccount";
 import { getCurrentSessionId } from "@/lib/auth";
@@ -10,6 +11,7 @@ import { dateTime } from "@/lib/format";
 export default async function Profile({ searchParams }: { searchParams: Promise<{ saved?: string; sent?: string }> }) {
   const { user } = await requireMembership();
   const { saved, sent } = await searchParams;
+  const large = (await cookies()).get("es_text")?.value === "lg";
   const [sessions, currentSid] = await Promise.all([
     db.session.findMany({ where: { userId: user.id, revokedAt: null }, orderBy: { lastSeenAt: "desc" }, take: 20 }),
     getCurrentSessionId(),
@@ -49,6 +51,15 @@ export default async function Profile({ searchParams }: { searchParams: Promise<
         <div className="lg:col-span-2"><SubmitButton>Запази</SubmitButton></div>
       </form>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card title="🔠 Размер на текста" className="lg:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-500">По-едрият текст се запомня за това устройство.</p>
+            <div className="flex gap-2" role="group" aria-label="Размер на текста">
+              <form action={setTextSize.bind(null, "normal")}><button aria-pressed={!large} className={!large ? "btn-primary btn-sm" : "btn-secondary btn-sm"}>Нормален</button></form>
+              <form action={setTextSize.bind(null, "lg")}><button aria-pressed={large} className={large ? "btn-primary btn-sm" : "btn-secondary btn-sm"}><span className="text-base">Едър</span></button></form>
+            </div>
+          </div>
+        </Card>
         <Card title="📧 Имейл">
           {user.emailVerifiedAt ? <p className="text-sm text-green-700">✅ Имейлът {user.email} е потвърден.</p> : (
             <>

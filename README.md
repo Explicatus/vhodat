@@ -1,5 +1,7 @@
 # 🏠 Входът — SaaS за управление на етажна собственост
 
+[![CI](https://github.com/Explicatus/vhodat/actions/workflows/ci.yml/badge.svg)](https://github.com/Explicatus/vhodat/actions/workflows/ci.yml)
+
 Платформа за домоуправители, управителни съвети и фирми за професионално управление на сгради в България.
 
 ## Функционалност
@@ -22,23 +24,44 @@
 Дизайн: **Liquid Glass** — полупрозрачни стъклени повърхности, светъл и тъмен режим, мобилна версия.
 
 ## Стек
-Next.js 15 (App Router, Server Actions) · TypeScript · Prisma · SQLite (dev) / PostgreSQL (prod) · Tailwind CSS · JWT сесии · Stripe (Connect + Billing) · Nodemailer (SMTP) · Infobip (SMS/Viber)
+Next.js 15 (App Router, Server Actions) · TypeScript · Prisma · PostgreSQL · Tailwind CSS · JWT сесии · Stripe (Connect + Billing) · Nodemailer (SMTP) · Infobip (SMS/Viber)
 
 ## Стартиране
+Нужни са Node.js 22 и PostgreSQL 16 (най-лесно с Docker).
 ```bash
 npm install
 cp .env.example .env
-npx prisma db push
-npm run db:seed      # демо данни
-npm run dev          # http://localhost:3000
+docker compose up -d db   # PostgreSQL на localhost:5432
+npm run db:migrate        # прилага миграциите
+npm run db:seed           # демо данни
+npm run dev               # http://localhost:3000
 ```
 Демо акаунти: `manager@demo.bg` / `demo1234` (управител), `resident@demo.bg` / `demo1234` (собственик, ап. 2). Код за покана: `DEMO2026`.
+
+### Промени в базата
+Схемата е в `prisma/schema.prisma`. След промяна: `npm run db:migrate -- --name описание` създава нова миграция в `prisma/migrations/` — commit-нете я заедно с кода. В продукция `prisma migrate deploy` (автоматично в Docker) прилага само новите миграции, без да трие данни.
+
+## Тестове
+```bash
+npm run build      # e2e тестовете вървят срещу продукционния build
+npm test           # unit + e2e (Playwright, Chromium)
+npm run test:unit  # само чистите функции — секунди, без браузър
+```
+- **unit** (`tests/unit`): пари в центове и точно разпределение, банкови извлечения (кодировки, формати, разпознаване на обект), българско време.
+- **e2e** (`tests/e2e`): всички потоци в истински браузър — плащания, известия, банков импорт, протоколи, абонаменти, заявки за обект, пароли, история, автоматизация, защита на входа, сесии, GDPR, както и **достъпност по WCAG 2.1 AA** (axe-core) на всички основни страници в светъл и тъмен режим.
+- Всеки e2e файл започва с нулиране на демо данните; писмата се записват в `test-results/outbox.jsonl`.
+- GitHub Actions пуска всичко при всеки push и pull request срещу истински PostgreSQL и проверява, че няма забравена миграция.
+
+## Достъпност и производителност
+- Контраст на текста ≥ 4.5:1 и етикети на всички полета (проверява се автоматично).
+- „Едър текст“ в профила (запомня се за устройството); уважават се системните настройки „Намали движението“ и „Намали прозрачността“.
+- Стъкленият ефект е оптимизиран за телефони: по-леко размазване, без повторно размазване на вложени панели, без филтър върху фона.
 
 ## Тестов режим
 С `PAYMENTS_MOCK="1"` и без `STRIPE_SECRET_KEY` плащанията с карта и абонаментите се симулират, а имейлите/SMS/Viber се извеждат в конзолата на сървъра. Така цялата платформа работи локално без външни услуги.
 
 ## Продукция
-1. **База данни:** в `prisma/schema.prisma` сменете `provider = "postgresql"`, задайте `DATABASE_URL` (Neon, Supabase, Railway).
+1. **База данни:** PostgreSQL (Neon, Supabase, Railway) → `DATABASE_URL`. Миграциите се прилагат с `npm run db:deploy` (в Docker — автоматично при старт; на Vercel — автоматично чрез скрипта `vercel-build`).
 2. **Сигурност:** дълъг случаен `SESSION_SECRET`, `APP_URL` = публичният адрес, `PAYMENTS_MOCK="0"`.
 3. **Stripe** (dashboard.stripe.com):
    - Активирайте **Connect** (Express акаунти) — за плащанията на собствениците към ЕС.
