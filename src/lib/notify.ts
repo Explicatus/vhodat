@@ -1,5 +1,6 @@
 import "server-only";
-import nodemailer from "nodemailer";
+import nodemailer, { type Mail } from "nodemailer";
+import { after } from "next/server";
 import { db } from "./db";
 
 type Msg = { title: string; body: string; link?: string };
@@ -7,7 +8,7 @@ type Target = { buildingId: string; userIds?: string[]; unitIds?: string[]; role
 
 const base = () => (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
 
-let transport: nodemailer.Transporter | null = null;
+let transport: Mail | null = null;
 export async function sendEmail(to: string, m: Msg) {
   const url = m.link ? `${base()}${m.link}` : base();
   if (!process.env.SMTP_HOST) {
@@ -74,17 +75,38 @@ export async function notify(t: Target, m: Msg) {
   if (!users.length) return 0;
   await db.notification.createMany({ data: users.map((u) => ({ userId: u.id, buildingId: t.buildingId, title: m.title, body: m.body, link: m.link })) });
 
-  // външните канали не трябва да бавят/чупят основната заявка
+  // Външните канали (имейл/SMS/Viber) не бавят отговора към потребителя, но и не се губят:
+  // after() държи сървърната функция жива, докато изпращането приключи (вкл. на Vercel).
   const jobs = users.flatMap((u) => {
     const phone = normalizePhone(u.phone);
-    return [
-      u.notifyEmail ? sendEmail(u.email, m) : null,
-      paidChannels && u.notifySms && phone ? sendSms(phone, m) : null,
-      paidChannels && u.notifyViber && phone ? sendViber(phone, m) : null,
-    ].filter(Boolean) as Promise<unknown>[];
+    const list: (Job | null)[] = [
+      u.notifyEmail ? () => sendEmail(u.email, m) : null,
+      paidChannels && u.notifySms && phone ? () => sendSms(phone, m) : null,
+      paidChannels && u.notifyViber && phone ? () => sendViber(phone, m) : null,
+    ];
+    return list.filter((j): j is Job => j !== null);
   });
-  Promise.allSettled(jobs).then((r) => r.forEach((x) => x.status === "rejected" && console.error("[notify]", x.reason)));
+  if (jobs.length) runAfterResponse(() => deliver(jobs));
   return users.length;
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+/** Изпраща всички съобщения паралелно; неуспешните се записват в лога, без да спират останалите. */
+type Job = () => Promise<unknown>;
+async function deliver(jobs: Job[]) {
+  const results = await Promise.allSettled(jobs.map((job) => job()));
+  for (const r of results) if (r.status === "rejected") console.error("[notify] delivery failed:", r.reason);
+}
+
+/**
+ * Изпълнява работа след изпращане на отговора. В заявка (server action, route handler)
+ * използва after(); извън заявка (скриптове, seed) я стартира веднага.
+ */
+function runAfterResponse(work: () => Promise<void>) {
+  try {
+    after(work);
+  } catch {
+    void work();
+  }
+}
