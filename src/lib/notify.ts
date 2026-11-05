@@ -10,7 +10,15 @@ const base = () => (process.env.APP_URL || "http://localhost:3000").replace(/\/$
 let transport: nodemailer.Transporter | null = null;
 export async function sendEmail(to: string, m: Msg) {
   const url = m.link ? `${base()}${m.link}` : base();
-  if (!process.env.SMTP_HOST) return console.log(`[email → ${to}] ${m.title}: ${m.body} ${url}`);
+  if (!process.env.SMTP_HOST) {
+    console.log(`[email → ${to}] ${m.title}: ${m.body} ${url}`);
+    // за автоматичните тестове: писмата се записват във файл вместо да се пращат
+    if (process.env.MAIL_OUTBOX_FILE) {
+      const { appendFileSync } = await import("fs");
+      appendFileSync(process.env.MAIL_OUTBOX_FILE, JSON.stringify({ to, title: m.title, body: m.body, url, at: new Date().toISOString() }) + "\n");
+    }
+    return;
+  }
   transport ??= nodemailer.createTransport({
     host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587),
     auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,

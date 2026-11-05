@@ -22,23 +22,28 @@
 Дизайн: **Liquid Glass** — полупрозрачни стъклени повърхности, светъл и тъмен режим, мобилна версия.
 
 ## Стек
-Next.js 15 (App Router, Server Actions) · TypeScript · Prisma · SQLite (dev) / PostgreSQL (prod) · Tailwind CSS · JWT сесии · Stripe (Connect + Billing) · Nodemailer (SMTP) · Infobip (SMS/Viber)
+Next.js 15 (App Router, Server Actions) · TypeScript · Prisma · PostgreSQL · Tailwind CSS · JWT сесии · Stripe (Connect + Billing) · Nodemailer (SMTP) · Infobip (SMS/Viber)
 
 ## Стартиране
+Нужни са Node.js 22 и PostgreSQL 16 (най-лесно с Docker).
 ```bash
 npm install
 cp .env.example .env
-npx prisma db push
-npm run db:seed      # демо данни
-npm run dev          # http://localhost:3000
+docker compose up -d db   # PostgreSQL на localhost:5432
+npm run db:migrate        # прилага миграциите
+npm run db:seed           # демо данни
+npm run dev               # http://localhost:3000
 ```
 Демо акаунти: `manager@demo.bg` / `demo1234` (управител), `resident@demo.bg` / `demo1234` (собственик, ап. 2). Код за покана: `DEMO2026`.
+
+### Промени в базата
+Схемата е в `prisma/schema.prisma`. След промяна: `npm run db:migrate -- --name описание` създава нова миграция в `prisma/migrations/` — commit-нете я заедно с кода. В продукция `prisma migrate deploy` (автоматично в Docker) прилага само новите миграции, без да трие данни.
 
 ## Тестов режим
 С `PAYMENTS_MOCK="1"` и без `STRIPE_SECRET_KEY` плащанията с карта и абонаментите се симулират, а имейлите/SMS/Viber се извеждат в конзолата на сървъра. Така цялата платформа работи локално без външни услуги.
 
 ## Продукция
-1. **База данни:** в `prisma/schema.prisma` сменете `provider = "postgresql"`, задайте `DATABASE_URL` (Neon, Supabase, Railway).
+1. **База данни:** PostgreSQL (Neon, Supabase, Railway) → `DATABASE_URL`. Миграциите се прилагат с `npm run db:deploy` (в Docker — автоматично при старт; на Vercel — автоматично чрез скрипта `vercel-build`).
 2. **Сигурност:** дълъг случаен `SESSION_SECRET`, `APP_URL` = публичният адрес, `PAYMENTS_MOCK="0"`.
 3. **Stripe** (dashboard.stripe.com):
    - Активирайте **Connect** (Express акаунти) — за плащанията на собствениците към ЕС.

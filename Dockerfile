@@ -16,5 +16,5 @@ WORKDIR /app
 ENV NODE_ENV=production PORT=3000
 COPY --from=build /app ./
 EXPOSE 3000
-# прилага схемата при старт, после пуска сървъра
-CMD ["sh", "-c", "npx prisma db push --skip-generate && npx next start -p $PORT"]
+# прилага новите миграции при старт (безопасно, без загуба на данни), после пуска сървъра
+CMD ["sh", "-c", "npx prisma migrate deploy && npx next start -p $PORT"]

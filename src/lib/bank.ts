@@ -86,11 +86,16 @@ export function matchUnit(t: { reason: string; counterparty: string | null }, un
     const u = units.find((x) => x.number.toLowerCase() === m[1].toLowerCase());
     if (u) return { unitId: u.id, confidence: "HIGH" };
   }
-  const hay = norm(`${t.counterparty ?? ""} ${t.reason}`);
-  for (const u of units) {
-    if (!u.ownerName) continue;
-    const parts = norm(u.ownerName).split(" ").filter((p) => p.length > 2);
-    if (parts.length >= 2 && parts.every((p) => hay.includes(p))) return { unitId: u.id, confidence: "MEDIUM" };
+  // по име: всички части от името на собственика трябва да присъстват като ЦЕЛИ думи
+  // (иначе „Иван“ съвпада с „Иванов“); при повече от един кандидат не гадаем
+  const words = new Set(norm(`${t.counterparty ?? ""} ${t.reason}`).split(" "));
+  const candidates = units
+    .map((u) => ({ u, parts: u.ownerName ? norm(u.ownerName).split(" ").filter((p) => p.length > 2) : [] }))
+    .filter(({ parts }) => parts.length >= 2 && parts.every((p) => words.has(p)));
+  if (candidates.length) {
+    const best = Math.max(...candidates.map((c) => c.parts.length));
+    const top = candidates.filter((c) => c.parts.length === best);
+    if (top.length === 1) return { unitId: top[0].u.id, confidence: "MEDIUM" };
   }
   return null;
 }

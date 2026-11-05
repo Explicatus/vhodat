@@ -5,3 +5,5 @@ node_modules
 *.db-journal
 next-env.d.ts
 tsconfig.tsbuildinfo
+test-results
+playwright-report
