@@ -6,7 +6,7 @@ import { date, money } from "@/lib/format";
 import { Card, Empty, PageHeader, Stat } from "@/components/ui";
 
 export default async function Dashboard() {
-  const { building, isManager, membership, user } = await requireMembership();
+  const { building, isManager, membership, user, unitIds } = await requireMembership();
   const [cash, balances, announcements, polls, openIssues] = await Promise.all([
     buildingCash(building.id),
     unitBalances(building.id),
@@ -16,7 +16,8 @@ export default async function Dashboard() {
   ]);
   const debtors = balances.filter((b) => b.balance > 0).sort((a, b) => b.balance - a.balance);
   const totalDebt = debtors.reduce((s, d) => s + d.balance, 0);
-  const mine = membership.unitId ? balances.find((b) => b.unit.id === membership.unitId) : undefined;
+  const myRows = balances.filter((b) => unitIds.includes(b.unit.id));
+  const mine = myRows.length ? { balance: myRows.reduce((s, r) => s + r.balance, 0) } : undefined;
 
   return (
     <>
@@ -85,7 +86,7 @@ export default async function Dashboard() {
             )}
           </Card>
         )}
-        {!isManager && !membership.unitId && (
+        {!isManager && (unitIds.length === 0 || membership.requestedUnitId) && (
           <Card title="Свържете обект" className="lg:col-span-2">
             <p className="text-sm text-slate-600">
               {membership.requestedUnitId

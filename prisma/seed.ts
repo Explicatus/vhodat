@@ -4,12 +4,13 @@ import bcrypt from "bcryptjs";
 const db = new PrismaClient();
 
 async function main() {
+  await db.rateLimitHit.deleteMany({});
   await db.building.deleteMany({ where: { inviteCode: "DEMO2026" } });
   await db.issue.deleteMany({ where: { author: { email: { in: ["manager@demo.bg", "resident@demo.bg"] } } } });
   await db.user.deleteMany({ where: { email: { in: ["manager@demo.bg", "resident@demo.bg"] } } });
   const hash = await bcrypt.hash("demo1234", 10);
-  const manager = await db.user.create({ data: { name: "Георги Димитров", email: "manager@demo.bg", phone: "0888 123 456", passwordHash: hash, emailVerifiedAt: new Date() } });
-  const resident = await db.user.create({ data: { name: "Мария Петрова", email: "resident@demo.bg", passwordHash: hash, emailVerifiedAt: new Date() } });
+  const manager = await db.user.create({ data: { name: "Георги Димитров", email: "manager@demo.bg", phone: "0888 123 456", passwordHash: hash, emailVerifiedAt: new Date(), termsAcceptedAt: new Date() } });
+  const resident = await db.user.create({ data: { name: "Мария Петрова", email: "resident@demo.bg", passwordHash: hash, emailVerifiedAt: new Date(), termsAcceptedAt: new Date() } });
 
   const b = await db.building.create({
     data: { name: "ЕС бл. 12, вх. А", address: "ж.к. Младост 1, бл. 12, вх. А", city: "София", bulstat: "176543210", iban: "BG80BNBG96611020345678", inviteCode: "DEMO2026", plan: "PRO", subscriptionStatus: "active", currentPeriodEnd: new Date(Date.now() + 20 * 864e5) },
@@ -24,8 +25,10 @@ async function main() {
   }
   await db.membership.createMany({ data: [
     { userId: manager.id, buildingId: b.id, role: "MANAGER" },
-    { userId: resident.id, buildingId: b.id, role: "RESIDENT", unitId: units[1].id },
+    { userId: resident.id, buildingId: b.id, role: "RESIDENT" },
   ] });
+  const resM = await db.membership.findFirstOrThrow({ where: { userId: resident.id, buildingId: b.id } });
+  await db.memberUnit.create({ data: { membershipId: resM.id, unitId: units[1].id } });
 
   const now = new Date();
   for (let k = 3; k >= 0; k--) {

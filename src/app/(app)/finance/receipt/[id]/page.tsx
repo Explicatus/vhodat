@@ -6,9 +6,9 @@ import { PrintButton } from "@/components/PrintButton";
 
 export default async function Receipt({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { building, isManager, membership } = await requireMembership();
+  const { building, isManager, unitIds } = await requireMembership();
   const p = await db.payment.findFirst({ where: { id, unit: { buildingId: building.id } }, include: { unit: true } });
-  if (!p || (!isManager && p.unitId !== membership.unitId)) notFound();
+  if (!p || (!isManager && !unitIds.includes(p.unitId))) notFound();
   return (
     <div className="mx-auto max-w-lg">
       <div className="card space-y-4 print:border-0 print:shadow-none">

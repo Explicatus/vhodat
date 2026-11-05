@@ -9,7 +9,7 @@ export default async function Register() {
   const { building } = await requireManager();
   const units = await db.unit.findMany({
     where: { buildingId: building.id },
-    include: { memberships: { include: { user: true } } },
+    include: { memberUnits: { include: { membership: { include: { user: true } } } } },
     orderBy: [{ entrance: "asc" }, { floor: "asc" }, { number: "asc" }],
   });
   const fmt = (n: number | null) => (n == null ? "" : n.toFixed(2).replace(".", ","));
@@ -33,7 +33,7 @@ export default async function Register() {
                 <td>{u.number}</td><td>{UNIT_KINDS[u.kind] ?? u.kind}</td><td>{u.entrance ?? ""}{u.floor != null ? ` / ${u.floor}` : ""}</td>
                 <td>{fmt(u.area)}</td><td>{fmt(u.idealParts)}</td>
                 <td>{u.ownerName ?? ""}{u.ownerEmail && <div className="text-xs">{u.ownerEmail}</div>}</td>
-                <td className="text-xs">{u.memberships.map((m) => `${m.user.name}${m.user.phone ? `, ${m.user.phone}` : ""}`).join("; ")}</td>
+                <td className="text-xs">{u.memberUnits.map((mu) => `${mu.membership.user.name}${mu.membership.user.phone ? `, ${mu.membership.user.phone}` : ""}`).join("; ")}</td>
                 <td>{u.residents}</td>
               </tr>
             ))}

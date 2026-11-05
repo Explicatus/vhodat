@@ -7,7 +7,7 @@ import { NavLinks } from "./NavLinks";
 import { BuildingSelect } from "./BuildingSelect";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, building, memberships, isManager, membership } = await requireMembership();
+  const { user, building, memberships, isManager, units } = await requireMembership();
   const unread = await db.notification.count({ where: { userId: user.id, readAt: null } });
   const links = [
     { href: "/dashboard", label: "Табло", icon: "🏠" },
@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/polls", label: "Гласувания", icon: "🗳️" },
     { href: "/issues", label: "Сигнали", icon: "🛠️" },
     { href: "/notifications", label: "Известия", icon: "🔔", badge: unread },
-    ...(isManager ? [{ href: "/settings", label: "Настройки", icon: "⚙️" }, { href: "/billing", label: "Абонамент", icon: "⭐" }] : []),
+    ...(isManager ? [{ href: "/history", label: "История", icon: "📜" }, { href: "/settings", label: "Настройки", icon: "⚙️" }, { href: "/billing", label: "Абонамент", icon: "⭐" }] : []),
   ];
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <BuildingSelect current={building.id} options={memberships.map((m) => ({ id: m.buildingId, name: m.building.name }))} />
             <noscript><button className="btn-secondary btn-sm mt-1">Смени</button></noscript>
             <div className="mt-1.5 flex items-center justify-between px-1 text-xs text-slate-500">
-              <span>{isManager ? "Управител" : membership.unit ? `Обект ${membership.unit.number}` : "Обитател"}</span>
+              <span>{isManager ? "Управител" : units.length ? `Обект ${units.map((u) => u.number).join(", ")}` : "Обитател"}</span>
               <Link href="/onboarding" className="text-brand-600 hover:underline">+ сграда</Link>
             </div>
           </form>
@@ -49,6 +49,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <Link href="/profile" className="block truncate text-sm font-semibold hover:underline">{user.name}</Link>
                 <form action={logout}><button className="text-xs text-slate-500 hover:text-red-600">Изход</button></form>
               </div>
+            </div>
+            <div className="mt-2 text-center text-[11px] text-slate-400">
+              <Link href="/privacy" className="hover:underline">Поверителност</Link> · <Link href="/terms" className="hover:underline">Условия</Link>
             </div>
           </div>
         </div>

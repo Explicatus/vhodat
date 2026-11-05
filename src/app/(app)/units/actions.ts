@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { audit } from "@/lib/audit";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireManager } from "@/lib/auth";
@@ -24,7 +25,7 @@ function unitData(form: FormData) {
 }
 
 export async function createUnit(form: FormData) {
-  const { building } = await requireManager();
+  const { building, user } = await requireManager();
   const data = unitData(form);
   if (!data.number) return;
   const exists = await db.unit.findUnique({ where: { buildingId_number: { buildingId: building.id, number: data.number } } });
@@ -34,13 +35,14 @@ export async function createUnit(form: FormData) {
     update: data,
     create: { ...data, buildingId: building.id },
   });
+  await audit(building.id, user, exists ? "unit.update" : "unit.create", `Обект ${data.number}${data.ownerName ? ` (${data.ownerName})` : ""}, такса ${(data.monthlyFeeCents / 100).toFixed(2)} €`);
   await syncSubscriptionQuantity(building.id);
   revalidatePath("/units");
 }
 
 /** Масово добавяне: по един ред „номер; етаж; собственик; живущи; такса; ид.части“ */
 export async function bulkCreateUnits(form: FormData) {
-  const { building } = await requireManager();
+  const { building, user } = await requireManager();
   const lines = str(form, "rows").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   let left = await remainingUnits(building);
   let limited = false;
@@ -63,28 +65,43 @@ export async function bulkCreateUnits(form: FormData) {
       create: { ...data, buildingId: building.id },
     });
   }
+  await audit(building.id, user, "unit.import", `Масов импорт: ${lines.length} реда`);
   await syncSubscriptionQuantity(building.id);
   if (limited) redirect("/billing?limit=1");
   revalidatePath("/units");
 }
 
 export async function updateUnit(id: string, form: FormData) {
-  const { building } = await requireManager();
-  await db.unit.updateMany({ where: { id, buildingId: building.id }, data: unitData(form) });
+  const { building, user } = await requireManager();
+  const before = await db.unit.findFirst({ where: { id, buildingId: building.id } });
+  if (!before) return;
+  const data = unitData(form);
+  await db.unit.update({ where: { id }, data });
+  // описваме само променените ключови полета
+  const changes: string[] = [];
+  if (before.monthlyFeeCents !== data.monthlyFeeCents) changes.push(`такса ${(before.monthlyFeeCents / 100).toFixed(2)} → ${(data.monthlyFeeCents / 100).toFixed(2)} €`);
+  if (before.ownerName !== data.ownerName) changes.push(`собственик „${before.ownerName ?? "—"}“ → „${data.ownerName ?? "—"}“`);
+  if (before.idealParts !== data.idealParts) changes.push(`ид. части ${before.idealParts} → ${data.idealParts}%`);
+  if (before.residents !== data.residents) changes.push(`живущи ${before.residents} → ${data.residents}`);
+  if (before.number !== data.number) changes.push(`номер ${before.number} → ${data.number}`);
+  if (changes.length) await audit(building.id, user, "unit.update", `Обект ${data.number}: ${changes.join("; ")}`);
   revalidatePath(`/units/${id}`);
   revalidatePath("/units");
 }
 
 export async function deleteUnit(id: string) {
-  const { building } = await requireManager();
-  await db.unit.deleteMany({ where: { id, buildingId: building.id } });
+  const { building, user } = await requireManager();
+  const u = await db.unit.findFirst({ where: { id, buildingId: building.id } });
+  if (!u) redirect("/units");
+  await db.unit.delete({ where: { id } });
+  await audit(building.id, user, "unit.delete", `Изтрит обект ${u.number}${u.ownerName ? ` (${u.ownerName})` : ""} с цялата му история`);
   await syncSubscriptionQuantity(building.id);
   redirect("/units");
 }
 
 /** Разпределя месечна такса пропорционално: по живущи или по идеални части. */
 export async function distributeFees(form: FormData) {
-  const { building } = await requireManager();
+  const { building, user } = await requireManager();
   const total = cents(form, "total");
   const basis = str(form, "basis"); // residents | idealParts | equal
   const units = await db.unit.findMany({ where: { buildingId: building.id } });
@@ -93,5 +110,6 @@ export async function distributeFees(form: FormData) {
   if (!sum || total <= 0) return;
   const shares = allocate(total, units.map(weight));
   await db.$transaction(units.map((u, i) => db.unit.update({ where: { id: u.id }, data: { monthlyFeeCents: shares[i] } })));
+  await audit(building.id, user, "unit.fees", `Разпределени ${(total / 100).toFixed(2)} €/месец ${basis === "residents" ? "по живущи" : basis === "idealParts" ? "по идеални части" : "по равно"} между ${units.length} обекта`, total);
   revalidatePath("/units");
 }

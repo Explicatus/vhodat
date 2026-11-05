@@ -11,7 +11,7 @@ import { reverseChargeBatch, deletePayment, generateMonthly, oneTimeCharge, reco
 
 export default async function Finance() {
   const ctx = await requireMembership();
-  return ctx.isManager ? <ManagerFinance buildingId={ctx.building.id} /> : <ResidentFinance unitId={ctx.membership.unitId} iban={ctx.building.iban} name={ctx.building.name} online={onlineEnabled(ctx.building)} />;
+  return ctx.isManager ? <ManagerFinance buildingId={ctx.building.id} /> : <ResidentFinance unitIds={ctx.unitIds} iban={ctx.building.iban} name={ctx.building.name} online={onlineEnabled(ctx.building)} />;
 }
 
 async function ManagerFinance({ buildingId }: { buildingId: string }) {
@@ -158,51 +158,64 @@ async function ManagerFinance({ buildingId }: { buildingId: string }) {
   );
 }
 
-async function ResidentFinance({ unitId, iban, name, online }: { unitId: string | null; iban: string | null; name: string; online: boolean }) {
-  if (!unitId) return (<><PageHeader title="Моите задължения" /><Empty>Профилът ви още не е свързан с обект. Свържете се с домоуправителя.</Empty></>);
-  const unit = await db.unit.findUnique({ where: { id: unitId }, include: { charges: { orderBy: { dueDate: "desc" } }, payments: { orderBy: { paidAt: "desc" } } } });
-  if (!unit) return null;
-  const charged = unit.charges.reduce((s, c) => s + c.amountCents, 0);
-  const paid = unit.payments.reduce((s, p) => s + p.amountCents, 0);
-  const balance = charged - paid;
+async function ResidentFinance({ unitIds, iban, name, online }: { unitIds: string[]; iban: string | null; name: string; online: boolean }) {
+  if (!unitIds.length) return (<><PageHeader title="Моите задължения" /><Empty>Профилът ви още не е свързан с обект. Свържете се с домоуправителя.</Empty></>);
+  const units = await db.unit.findMany({
+    where: { id: { in: unitIds } },
+    include: { charges: { orderBy: { dueDate: "desc" } }, payments: { orderBy: { paidAt: "desc" } } },
+    orderBy: { number: "asc" },
+  });
+  const rows = units.map((u) => {
+    const charged = u.charges.reduce((s, c) => s + c.amountCents, 0);
+    const paid = u.payments.reduce((s, p) => s + p.amountCents, 0);
+    return { u, charged, paid, balance: charged - paid };
+  });
+  const total = rows.reduce((a, r) => ({ charged: a.charged + r.charged, paid: a.paid + r.paid, balance: a.balance + r.balance }), { charged: 0, paid: 0, balance: 0 });
+  const many = rows.length > 1;
   return (
     <>
-      <PageHeader title="Моите задължения" subtitle={`Обект ${unit.number} · месечна такса ${money(unit.monthlyFeeCents)}`} />
+      <PageHeader title="Моите задължения" subtitle={many ? `${rows.length} обекта: ${rows.map((r) => r.u.number).join(", ")}` : `Обект ${rows[0].u.number} · месечна такса ${money(rows[0].u.monthlyFeeCents)}`} />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Stat label="Салдо" value={money(Math.abs(balance))} hint={balance > 0 ? "Дължима сума" : balance < 0 ? "Надплатено" : "Нямате задължения"} tone={balance > 0 ? "bad" : "good"} />
-        <Stat label="Общо начислено" value={money(charged)} />
-        <Stat label="Общо платено" value={money(paid)} />
+        <Stat label={many ? "Общо салдо" : "Салдо"} value={money(Math.abs(total.balance))} hint={total.balance > 0 ? "Дължима сума" : total.balance < 0 ? "Надплатено" : "Нямате задължения"} tone={total.balance > 0 ? "bad" : "good"} />
+        <Stat label="Общо начислено" value={money(total.charged)} />
+        <Stat label="Общо платено" value={money(total.paid)} />
       </div>
-      {online && (
-        <Card title="💳 Плащане с карта" className="mb-6">
-          <form action={startCardPayment} className="flex flex-wrap items-end gap-3">
-            <label className="block"><span className="label">Сума (€)</span>
-              <input name="amount" type="number" step="0.01" min={1} max={MAX_ONLINE / 100} defaultValue={euroInput(balance > 0 ? balance : unit.monthlyFeeCents)} required className="input w-40" />
-            </label>
-            <SubmitButton>{balance > 0 ? "Плати задължението" : "Плати авансово"}</SubmitButton>
-            <span className="text-xs text-slate-500">Visa, Mastercard, Apple Pay, Google Pay · защитено от Stripe</span>
-          </form>
-        </Card>
-      )}
-      {balance > 0 && iban && (
-        <Card title="Банков превод" className="mb-6">
-          <p className="text-sm">Към <b>{name}</b>, IBAN <b className="font-mono">{iban}</b>, основание: <b>Такса обект {unit.number}</b>. Или в брой на домоуправителя.</p>
-        </Card>
-      )}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Задължения">
-          <table className="table"><tbody>
-            {unit.charges.map((c) => <tr key={c.id}><td>{periodLabel(c.period)}</td><td>{c.description || CHARGE_TYPES[c.type]}</td><td className="text-right">{money(c.amountCents)}</td></tr>)}
-            {unit.charges.length === 0 && <tr><td className="text-slate-400">Няма</td></tr>}
-          </tbody></table>
-        </Card>
-        <Card title="Плащания">
-          <table className="table"><tbody>
-            {unit.payments.map((p) => <tr key={p.id}><td>{date(p.paidAt)}</td><td>{PAYMENT_METHODS[p.method]}</td><td className="text-right text-green-700">{money(p.amountCents)}</td><td className="text-right"><Link href={`/finance/receipt/${p.id}`} className="text-xs text-brand-600 hover:underline">Разписка</Link></td></tr>)}
-            {unit.payments.length === 0 && <tr><td className="text-slate-400">Няма</td></tr>}
-          </tbody></table>
-        </Card>
-      </div>
+      {rows.map(({ u, balance }) => (
+        <section key={u.id} className="mb-8">
+          {many && <h2 className="mb-3 text-lg font-semibold">Обект {u.number} <span className="text-sm font-normal text-slate-500">· такса {money(u.monthlyFeeCents)} · салдо <span className={balance > 0 ? "text-red-600" : "text-green-700"}>{money(balance)}</span></span></h2>}
+          {online && (
+            <Card title={many ? undefined : "💳 Плащане с карта"} className="mb-4">
+              <form action={startCardPayment} className="flex flex-wrap items-end gap-3">
+                <input type="hidden" name="unitId" value={u.id} />
+                <label className="block"><span className="label">{many ? `💳 Плащане с карта за обект ${u.number} (€)` : "Сума (€)"}</span>
+                  <input name="amount" type="number" step="0.01" min={1} max={MAX_ONLINE / 100} defaultValue={euroInput(balance > 0 ? balance : u.monthlyFeeCents)} required className="input w-40" />
+                </label>
+                <SubmitButton>{balance > 0 ? "Плати задължението" : "Плати авансово"}</SubmitButton>
+                <span className="text-xs text-slate-500">Visa, Mastercard, Apple Pay, Google Pay · защитено от Stripe</span>
+              </form>
+            </Card>
+          )}
+          {balance > 0 && iban && (
+            <Card title={many ? undefined : "Банков превод"} className="mb-4">
+              <p className="text-sm">Банков превод към <b>{name}</b>, IBAN <b className="font-mono">{iban}</b>, основание: <b>Такса обект {u.number}</b>. Или в брой на домоуправителя.</p>
+            </Card>
+          )}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card title="Задължения">
+              <table className="table"><tbody>
+                {u.charges.map((c) => <tr key={c.id}><td>{periodLabel(c.period)}</td><td>{c.description || CHARGE_TYPES[c.type]}</td><td className="text-right">{money(c.amountCents)}</td></tr>)}
+                {u.charges.length === 0 && <tr><td className="text-slate-400">Няма</td></tr>}
+              </tbody></table>
+            </Card>
+            <Card title="Плащания">
+              <table className="table"><tbody>
+                {u.payments.map((p) => <tr key={p.id}><td>{date(p.paidAt)}</td><td>{PAYMENT_METHODS[p.method]}</td><td className="text-right text-green-700">{money(p.amountCents)}</td><td className="text-right"><Link href={`/finance/receipt/${p.id}`} className="text-xs text-brand-600 hover:underline">Разписка</Link></td></tr>)}
+                {u.payments.length === 0 && <tr><td className="text-slate-400">Няма</td></tr>}
+              </tbody></table>
+            </Card>
+          </div>
+        </section>
+      ))}
     </>
   );
 }

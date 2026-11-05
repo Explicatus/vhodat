@@ -14,8 +14,8 @@ model User {
   phone        String?
   passwordHash String
   emailVerifiedAt DateTime?
-  // увеличава се при смяна на парола / „изход от всички устройства“ → старите сесии стават невалидни
-  sessionVersion Int        @default(0)
+  termsAcceptedAt DateTime?
+  deletedAt       DateTime?
   notifyEmail  Boolean      @default(true)
   notifySms    Boolean      @default(false)
   notifyViber  Boolean      @default(false)
@@ -27,6 +27,7 @@ model User {
   votes        Vote[]
   onlinePayments OnlinePayment[]
   authTokens   AuthToken[]
+  sessions     Session[]
 }
 
 // Етажна собственост (сграда / вход)
@@ -47,6 +48,12 @@ model Building {
   stripeSubscriptionId String?   @unique
   subscriptionStatus   String?
   currentPeriodEnd     DateTime?
+  // Автоматизация: ден от месеца (1–28) или null = изключено
+  autoChargeDay        Int?
+  autoRepairFundCents  Int       @default(0)
+  autoRemindDay        Int?
+  lastAutoChargePeriod String?
+  lastAutoRemindPeriod String?
   createdAt     DateTime       @default(now())
   onlinePayments OnlinePayment[]
   memberships   Membership[]
@@ -63,13 +70,12 @@ model Membership {
   userId     String
   buildingId String
   role       String   @default("RESIDENT")
-  unitId     String?
   // заявка за обект, която чака одобрение от управителя
   requestedUnitId String?
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  unit       Unit?    @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  units      MemberUnit[]
 
   @@unique([userId, buildingId])
 }
@@ -91,7 +97,7 @@ model Unit {
   building    Building     @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   charges     Charge[]
   payments    Payment[]
-  memberships Membership[]
+  memberUnits MemberUnit[]
   votes       Vote[]
   onlinePayments OnlinePayment[]
 
@@ -267,4 +273,53 @@ model AuthToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type])
+}
+
+// Връзка потребител ↔ обект. Един собственик може да има няколко обекта (апартамент + гараж).
+model MemberUnit {
+  id           String     @id @default(cuid())
+  membershipId String
+  unitId       String
+  createdAt    DateTime   @default(now())
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  unit         Unit       @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, unitId])
+}
+
+// Неизтриваема история на промените (кой, какво, кога) — за прозрачност и при спорове.
+model AuditLog {
+  id          String   @id @default(cuid())
+  buildingId  String
+  userId      String?
+  userName    String   // снимка на името към момента (остава и ако профилът бъде изтрит)
+  action      String   // напр. payment.create, charge.reverse, member.role
+  summary     String
+  amountCents Int?
+  createdAt   DateTime @default(now())
+
+  @@index([buildingId, createdAt])
+}
+
+// Вход от едно устройство. Може да се прекрати поотделно („Изход“ на конкретно устройство).
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+}
+
+// Опити за вход / регистрация / възстановяване — за ограничаване на атаки с налучкване.
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
 }

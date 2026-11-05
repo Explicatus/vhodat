@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { requireManager, requireMembership } from "@/lib/auth";
 import { optStr, str } from "@/lib/util";
@@ -17,11 +18,12 @@ export async function createIssue(form: FormData) {
 }
 
 export async function setIssueStatus(id: string, status: string) {
-  const { building } = await requireManager();
+  const { building, user } = await requireManager();
   if (!["OPEN", "IN_PROGRESS", "RESOLVED"].includes(status)) return;
   const issue = await db.issue.findFirst({ where: { id, buildingId: building.id } });
   if (!issue) return;
   await db.issue.update({ where: { id }, data: { status } });
+  await audit(building.id, user, "issue.status", `„${issue.title}“ → ${ISSUE_STATUS[status].label}`);
   await notify({ buildingId: building.id, userIds: [issue.authorId] }, { title: `Сигнал „${issue.title}“: ${ISSUE_STATUS[status].label}`, body: `Статусът на вашия сигнал е променен на „${ISSUE_STATUS[status].label}“.`, link: "/issues" });
   revalidatePath("/issues");
 }
