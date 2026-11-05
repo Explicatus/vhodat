@@ -2,7 +2,8 @@ import { requireManager } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
-import { regenerateInvite, removeMember, updateBuilding, updateMember } from "./actions";
+import { connectStripe, regenerateInvite, removeMember, stripeDashboard, updateBuilding, updateMember } from "./actions";
+import { mockMode, platformFeePercent, stripeConfigured } from "@/lib/payments";
 
 export default async function Settings() {
   const { building, membership: me } = await requireManager();
@@ -28,8 +29,28 @@ export default async function Settings() {
         </Card>
         <Card title="🔑 Покана за живущите">
           <p className="text-sm text-slate-600">Споделете този код с собствениците. Те се регистрират и въвеждат кода и номера на своя обект.</p>
-          <div className="my-4 rounded-xl bg-brand-50 p-4 text-center font-mono text-3xl font-bold tracking-widest text-brand-700">{building.inviteCode}</div>
+          <div className="my-4 rounded-xl bg-brand-500/10 p-4 text-center font-mono text-3xl font-bold tracking-widest text-brand-700">{building.inviteCode}</div>
           <form action={regenerateInvite}><SubmitButton className="btn-secondary btn-sm" confirm="Старият код ще спре да работи. Продължаване?">Генерирай нов код</SubmitButton></form>
+        </Card>
+        <Card title="💳 Онлайн плащания с карта" className="lg:col-span-2">
+          {mockMode() ? (
+            <p className="text-sm text-amber-700">🧪 <b>Тестов режим</b> — собствениците могат да „плащат“ с карта без реален Stripe. За реални плащания задайте <code>STRIPE_SECRET_KEY</code> и изключете <code>PAYMENTS_MOCK</code>.</p>
+          ) : !stripeConfigured() ? (
+            <p className="text-sm text-slate-600">Онлайн плащанията не са конфигурирани на сървъра (липсва <code>STRIPE_SECRET_KEY</code>).</p>
+          ) : building.stripeChargesEnabled ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-green-700">✅ Активни. Собствениците плащат с карта, Apple Pay и Google Pay, а парите постъпват директно в банковата сметка на етажната собственост.</p>
+              <form action={stripeDashboard}><SubmitButton className="btn-secondary">Stripe табло →</SubmitButton></form>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-slate-600">
+                {building.stripeAccountId ? "Настройката не е завършена — Stripe чака още данни." : "Свържете банковата сметка на ЕС чрез Stripe (≈5 мин.). Парите от плащанията постъпват директно при вас."}
+              </p>
+              <form action={connectStripe}><SubmitButton>{building.stripeAccountId ? "Продължи настройката" : "Свържи Stripe"}</SubmitButton></form>
+            </div>
+          )}
+          {platformFeePercent() > 0 && <p className="mt-2 text-xs text-slate-400">Такса на платформата: {platformFeePercent()}% от всяко онлайн плащане (плюс таксата на Stripe).</p>}
         </Card>
         <Card title="👥 Членове" className="lg:col-span-2">
           <div className="overflow-x-auto">

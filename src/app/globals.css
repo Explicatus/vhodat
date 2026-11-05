@@ -2,21 +2,142 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body { @apply bg-slate-50 text-slate-800 antialiased; }
-  h1, h2, h3 { @apply text-slate-900; }
+/* ───────────── Liquid Glass ───────────── */
+:root {
+  color-scheme: light;
+  --bg: #eef2fb;
+  --fg: #0f172a;
+  --muted: #64748b;
+  --glass-from: rgba(255, 255, 255, 0.72);
+  --glass-to: rgba(255, 255, 255, 0.38);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-edge: rgba(255, 255, 255, 0.95);
+  --glass-shadow: 0 1px 1px rgba(15, 23, 42, 0.04), 0 10px 40px -8px rgba(30, 41, 99, 0.18);
+  --field: rgba(255, 255, 255, 0.55);
+  --field-border: rgba(148, 163, 184, 0.35);
+  --line: rgba(100, 116, 139, 0.16);
+  --blob-1: #60a5fa; --blob-2: #a78bfa; --blob-3: #34d399; --blob-4: #f472b6;
 }
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #070b18;
+    --fg: #e5e9f5;
+    --muted: #94a3b8;
+    --glass-from: rgba(40, 48, 78, 0.55);
+    --glass-to: rgba(20, 26, 48, 0.32);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-edge: rgba(255, 255, 255, 0.28);
+    --glass-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 16px 50px -10px rgba(0, 0, 0, 0.6);
+    --field: rgba(15, 23, 42, 0.45);
+    --field-border: rgba(148, 163, 184, 0.22);
+    --line: rgba(148, 163, 184, 0.14);
+    --blob-1: #1d4ed8; --blob-2: #7c3aed; --blob-3: #0f766e; --blob-4: #be185d;
+  }
+}
+
+@layer base {
+  html { background: var(--bg); }
+  body { @apply antialiased; color: var(--fg); background: transparent; min-height: 100vh; position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif; }
+  /* живият цветен фон, който прозира през стъклото */
+  body::before {
+    content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(38% 42% at 12% 18%, var(--blob-1) 0%, transparent 70%),
+      radial-gradient(34% 40% at 88% 12%, var(--blob-2) 0%, transparent 70%),
+      radial-gradient(40% 44% at 78% 88%, var(--blob-3) 0%, transparent 70%),
+      radial-gradient(30% 36% at 18% 92%, var(--blob-4) 0%, transparent 70%);
+    opacity: .55; filter: blur(40px) saturate(140%);
+    animation: drift 28s ease-in-out infinite alternate;
+  }
+  h1, h2, h3 { color: var(--fg); letter-spacing: -0.015em; }
+}
+@keyframes drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(3%, -2%, 0) scale(1.05); }
+  100% { transform: translate3d(-3%, 3%, 0) scale(1.02); }
+}
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+
 @layer components {
-  .input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100; }
-  .label { @apply mb-1 block text-sm font-medium text-slate-700; }
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50; }
-  .btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700; }
-  .btn-secondary { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
-  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
-  .btn-sm { @apply px-2.5 py-1 text-xs; }
-  .card { @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm; }
+  /* основен материал — „течно стъкло“ */
+  .glass {
+    position: relative; isolation: isolate;
+    background: linear-gradient(135deg, var(--glass-from), var(--glass-to));
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 -1px 0 rgba(255,255,255,.06), var(--glass-shadow);
+  }
+  /* огледален отблясък в горния ляв ъгъл */
+  .glass::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+    background: radial-gradient(120% 60% at 0% 0%, rgba(255,255,255,.35), transparent 45%);
+    mix-blend-mode: soft-light;
+  }
+  .card { @apply glass rounded-3xl p-5; }
+
+  .input {
+    @apply w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none transition;
+    color: var(--fg); background: var(--field); border: 1px solid var(--field-border);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 2px rgba(15,23,42,.06);
+  }
+  .input:focus { border-color: rgba(59,130,246,.7); box-shadow: 0 0 0 4px rgba(59,130,246,.18), inset 0 1px 2px rgba(15,23,42,.06); }
+  .input option { color: #0f172a; background: #fff; }
+  .label { @apply mb-1 block text-sm font-medium; color: var(--muted); }
+
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200 active:scale-[.97] disabled:opacity-50; }
+  .btn-primary {
+    @apply btn text-white;
+    background: linear-gradient(180deg, #4f8bff 0%, #2563eb 55%, #1d4ed8 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -2px 6px rgba(0,0,0,.15), 0 8px 24px -6px rgba(37,99,235,.55);
+  }
+  .btn-primary:hover { filter: brightness(1.08); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 12px 30px -6px rgba(37,99,235,.65); }
+  .btn-secondary { @apply btn glass; color: var(--fg); }
+  .btn-secondary:hover { filter: brightness(1.06); }
+  .btn-danger { @apply btn text-white; background: linear-gradient(180deg, #f87171, #dc2626); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 8px 20px -6px rgba(220,38,38,.5); }
+  .btn-sm { @apply px-3 py-1 text-xs; }
+
   .table { @apply w-full text-left text-sm; }
-  .table th { @apply border-b border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500; }
-  .table td { @apply border-b border-slate-100 px-3 py-2.5; }
-  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+  .table th { @apply px-3 py-2 text-[11px] font-semibold uppercase tracking-wider; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .table td { @apply px-3 py-2.5; border-bottom: 1px solid var(--line); }
+  .table tbody tr { @apply transition-colors; }
+  .table tbody tr:hover { background: rgba(255,255,255,.18); }
+  .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold; backdrop-filter: blur(8px); }
+
+  .nav-pill { @apply flex shrink-0 items-center gap-2.5 rounded-2xl px-3 py-2 text-sm transition; color: var(--muted); }
+  .nav-pill:hover { background: rgba(255,255,255,.22); color: var(--fg); }
+  .nav-pill-active { @apply glass font-semibold; color: var(--fg); }
+}
+
+/* тъмен режим: адаптира неутралните текстови класове извън документите за печат */
+@media (prefers-color-scheme: dark) {
+  .text-slate-900:not(.doc *), .text-slate-800:not(.doc *), .text-slate-700:not(.doc *) { color: #e2e8f0; }
+  .text-slate-600:not(.doc *) { color: #cbd5e1; }
+  .text-slate-500:not(.doc *), .text-slate-400:not(.doc *) { color: #94a3b8; }
+  .text-brand-700:not(.doc *), .text-brand-600:not(.doc *) { color: #93b4ff; }
+  .text-green-700, .text-green-600 { color: #4ade80; }
+  .text-red-700, .text-red-600 { color: #f87171; }
+  .text-amber-700, .text-amber-800 { color: #fbbf24; }
+  .text-green-800 { color: #86efac; }
+  .border-slate-100, .border-slate-200, .border-slate-300 { border-color: var(--line); }
+  .bg-slate-100 { background-color: rgba(148,163,184,.15); }
+}
+
+/* Документи за печат (протокол, книга на ЕС) */
+.doc { @apply rounded-3xl bg-white p-8 text-slate-900 shadow-xl; }
+.doc section { @apply mt-6; }
+.doc h2 { @apply mb-2 text-base font-bold; }
+.doc p { @apply mb-1 text-sm leading-relaxed; }
+.doc table { @apply w-full border-collapse text-sm; }
+.doc th, .doc td { @apply border border-slate-300 px-2 py-1 text-left; }
+.doc th { @apply bg-slate-100 font-semibold; }
+@media print {
+  @page { size: A4; margin: 15mm; }
+  body { background: #fff !important; }
+  body::before, aside, .print\:hidden { display: none !important; }
+  main { padding: 0 !important; }
+  .doc { box-shadow: none; padding: 0; border-radius: 0; }
 }

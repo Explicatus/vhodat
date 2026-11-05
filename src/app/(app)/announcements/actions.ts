@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireManager } from "@/lib/auth";
 import { str } from "@/lib/util";
+import { notify } from "@/lib/notify";
 
 export async function createAnnouncement(form: FormData) {
   const { building, user } = await requireManager();
@@ -10,6 +11,7 @@ export async function createAnnouncement(form: FormData) {
   const body = str(form, "body");
   if (!title || !body) return;
   await db.announcement.create({ data: { buildingId: building.id, authorId: user.id, title, body, pinned: form.get("pinned") === "on" } });
+  await notify({ buildingId: building.id, excludeUserId: user.id }, { title: `📢 ${title}`, body: body.slice(0, 280), link: "/announcements" });
   revalidatePath("/announcements");
 }
 

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireManager } from "@/lib/auth";
 import { num, optStr, str } from "@/lib/util";
+import { remainingUnits, syncSubscriptionQuantity } from "@/lib/billing";
 
 function unitData(form: FormData) {
   const floor = str(form, "floor");
@@ -25,11 +26,14 @@ export async function createUnit(form: FormData) {
   const { building } = await requireManager();
   const data = unitData(form);
   if (!data.number) return;
+  const exists = await db.unit.findUnique({ where: { buildingId_number: { buildingId: building.id, number: data.number } } });
+  if (!exists && (await remainingUnits(building)) < 1) redirect("/billing?limit=1");
   await db.unit.upsert({
     where: { buildingId_number: { buildingId: building.id, number: data.number } },
     update: data,
     create: { ...data, buildingId: building.id },
   });
+  await syncSubscriptionQuantity(building.id);
   revalidatePath("/units");
 }
 
@@ -37,9 +41,13 @@ export async function createUnit(form: FormData) {
 export async function bulkCreateUnits(form: FormData) {
   const { building } = await requireManager();
   const lines = str(form, "rows").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let left = await remainingUnits(building);
+  let limited = false;
   for (const line of lines) {
     const [number, floor, ownerName, residents, fee, ideal] = line.split(/[;\t]/).map((x) => x?.trim());
     if (!number) continue;
+    const exists = await db.unit.findUnique({ where: { buildingId_number: { buildingId: building.id, number } } });
+    if (!exists) { if (left < 1) { limited = true; continue; } left--; }
     const data = {
       number,
       floor: floor ? parseInt(floor, 10) || null : null,
@@ -54,6 +62,8 @@ export async function bulkCreateUnits(form: FormData) {
       create: { ...data, buildingId: building.id },
     });
   }
+  await syncSubscriptionQuantity(building.id);
+  if (limited) redirect("/billing?limit=1");
   revalidatePath("/units");
 }
 
@@ -67,6 +77,7 @@ export async function updateUnit(id: string, form: FormData) {
 export async function deleteUnit(id: string) {
   const { building } = await requireManager();
   await db.unit.deleteMany({ where: { id, buildingId: building.id } });
+  await syncSubscriptionQuantity(building.id);
   redirect("/units");
 }
 

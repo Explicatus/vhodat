@@ -16,7 +16,7 @@ export default async function Units() {
   );
   return (
     <>
-      <PageHeader title="Обекти" subtitle="Апартаменти, магазини, гаражи и техните собственици" />
+      <PageHeader title="Обекти" subtitle="Апартаменти, магазини, гаражи и техните собственици" action={<Link href="/units/register" className="btn-secondary">📘 Книга на ЕС</Link>} />
       <Card className="mb-6">
         {rows.length === 0 ? <Empty>Още няма обекти. Добавете ги по-долу — поотделно или наведнъж.</Empty> : (
           <div className="overflow-x-auto">
@@ -24,7 +24,7 @@ export default async function Units() {
               <thead><tr><th>№</th><th>Вид</th><th>Етаж</th><th>Собственик</th><th>Живущи</th><th>Ид. части</th><th className="text-right">Такса</th><th className="text-right">Салдо</th></tr></thead>
               <tbody>
                 {rows.map(({ unit: u, balance }) => (
-                  <tr key={u.id} className="hover:bg-slate-50">
+                  <tr key={u.id} className="hover:bg-white/25">
                     <td><Link href={`/units/${u.id}`} className="font-medium text-brand-600 hover:underline">{u.number}</Link></td>
                     <td>{UNIT_KINDS[u.kind] ?? u.kind}</td>
                     <td>{u.floor ?? "—"}</td>

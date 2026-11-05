@@ -5,11 +5,13 @@ import { unitBalances } from "@/lib/finance";
 import { CHARGE_TYPES, currentPeriod, date, money, PAYMENT_METHODS, periodLabel } from "@/lib/format";
 import { Card, Empty, PageHeader, Stat } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
-import { deletePayment, generateMonthly, oneTimeCharge, recordPayment } from "./actions";
+import { onlineEnabled, MAX_ONLINE } from "@/lib/payments";
+import { startCardPayment } from "@/app/pay/actions";
+import { deletePayment, generateMonthly, oneTimeCharge, recordPayment, remindDebtors } from "./actions";
 
 export default async function Finance() {
   const ctx = await requireMembership();
-  return ctx.isManager ? <ManagerFinance buildingId={ctx.building.id} /> : <ResidentFinance unitId={ctx.membership.unitId} iban={ctx.building.iban} name={ctx.building.name} />;
+  return ctx.isManager ? <ManagerFinance buildingId={ctx.building.id} /> : <ResidentFinance unitId={ctx.membership.unitId} iban={ctx.building.iban} name={ctx.building.name} online={onlineEnabled(ctx.building)} />;
 }
 
 async function ManagerFinance({ buildingId }: { buildingId: string }) {
@@ -27,6 +29,8 @@ async function ManagerFinance({ buildingId }: { buildingId: string }) {
     <>
       <PageHeader title="Такси и плащания" action={
         <div className="flex gap-2">
+          <Link href="/finance/import" className="btn-secondary">🏦 Импорт от банка</Link>
+          <form action={remindDebtors}><SubmitButton className="btn-secondary" confirm="Да изпратим ли напомняне до всички длъжници?">🔔 Напомни на длъжниците</SubmitButton></form>
           <a href="/api/export/balances" className="btn-secondary">⬇ Салда (CSV)</a>
           <a href="/api/export/payments" className="btn-secondary">⬇ Плащания (CSV)</a>
         </div>
@@ -123,7 +127,7 @@ async function ManagerFinance({ buildingId }: { buildingId: string }) {
   );
 }
 
-async function ResidentFinance({ unitId, iban, name }: { unitId: string | null; iban: string | null; name: string }) {
+async function ResidentFinance({ unitId, iban, name, online }: { unitId: string | null; iban: string | null; name: string; online: boolean }) {
   if (!unitId) return (<><PageHeader title="Моите задължения" /><Empty>Профилът ви още не е свързан с обект. Свържете се с домоуправителя.</Empty></>);
   const unit = await db.unit.findUnique({ where: { id: unitId }, include: { charges: { orderBy: { dueDate: "desc" } }, payments: { orderBy: { paidAt: "desc" } } } });
   if (!unit) return null;
@@ -138,9 +142,20 @@ async function ResidentFinance({ unitId, iban, name }: { unitId: string | null; 
         <Stat label="Общо начислено" value={money(charged)} />
         <Stat label="Общо платено" value={money(paid)} />
       </div>
+      {online && (
+        <Card title="💳 Плащане с карта" className="mb-6">
+          <form action={startCardPayment} className="flex flex-wrap items-end gap-3">
+            <label className="block"><span className="label">Сума (€)</span>
+              <input name="amount" type="number" step="0.01" min={1} max={MAX_ONLINE} defaultValue={balance > 0 ? balance.toFixed(2) : unit.monthlyFee.toFixed(2)} required className="input w-40" />
+            </label>
+            <SubmitButton>{balance > 0 ? "Плати задължението" : "Плати авансово"}</SubmitButton>
+            <span className="text-xs text-slate-500">Visa, Mastercard, Apple Pay, Google Pay · защитено от Stripe</span>
+          </form>
+        </Card>
+      )}
       {balance > 0 && iban && (
-        <Card title="Как да платя?" className="mb-6">
-          <p className="text-sm">Банков превод към <b>{name}</b>, IBAN <b className="font-mono">{iban}</b>, основание: <b>Такса обект {unit.number}</b>. Или в брой на домоуправителя.</p>
+        <Card title="Банков превод" className="mb-6">
+          <p className="text-sm">Към <b>{name}</b>, IBAN <b className="font-mono">{iban}</b>, основание: <b>Такса обект {unit.number}</b>. Или в брой на домоуправителя.</p>
         </Card>
       )}
       <div className="grid gap-6 lg:grid-cols-2">

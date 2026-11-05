@@ -25,7 +25,7 @@ export default async function Polls() {
               <Link key={p.id} href={`/polls/${p.id}`} className="card block hover:border-brand-500">
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="font-semibold">{p.question}</h3>
-                  <Badge className={open ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}>{open ? "Активно" : "Приключило"}</Badge>
+                  <Badge className={open ? "bg-green-500/15 text-green-700" : "bg-slate-500/15 text-slate-600"}>{open ? "Активно" : "Приключило"}</Badge>
                 </div>
                 <div className="mt-1 text-xs text-slate-500">Срок: {date(p.closesAt)} · Гласували {p._count.votes} от {unitCount} обекта</div>
               </Link>

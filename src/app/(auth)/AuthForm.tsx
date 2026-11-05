@@ -9,10 +9,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <Link href="/" className="mb-6 block text-center text-2xl font-bold text-brand-700">🏠 Входът</Link>
-        <form action={action} className="card space-y-4">
+        <Link href="/" className="mb-6 flex items-center justify-center gap-2 text-2xl font-bold"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 text-white shadow-lg shadow-indigo-500/30">⌂</span>Входът</Link>
+        <form action={action} className="card space-y-4 p-7">
           <h1 className="text-xl font-bold">{mode === "login" ? "Вход" : "Създайте акаунт"}</h1>
-          {state?.error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{state.error}</div>}
+          {state?.error && <div className="rounded-lg bg-red-500/15 p-3 text-sm text-red-700">{state.error}</div>}
           {mode === "register" && (
             <>
               <label className="block"><span className="label">Име и фамилия</span><input name="name" required className="input" /></label>

@@ -28,6 +28,7 @@ export default async function Dashboard() {
             value={mine ? money(Math.abs(mine.balance)) : "—"}
             hint={!mine ? "Нямате свързан обект" : mine.balance > 0 ? "Дължима сума" : mine.balance < 0 ? "Надплатено" : "Нямате задължения"}
             tone={mine && mine.balance > 0 ? "bad" : "good"}
+            action={mine && mine.balance > 0 ? <Link href="/finance" className="btn-primary btn-sm mt-2">💳 Плати онлайн</Link> : undefined}
           />
         )}
         <Stat label="Наличност в касата" value={money(cash.cash)} hint={`Приходи ${money(cash.income)} · Разходи ${money(cash.expenses)}`} tone={cash.cash >= 0 ? "good" : "bad"} />
@@ -41,7 +42,7 @@ export default async function Dashboard() {
           {announcements.length === 0 ? <Empty>Няма обяви.</Empty> : (
             <ul className="space-y-3">
               {announcements.map((a) => (
-                <li key={a.id} className="border-b border-slate-100 pb-3 last:border-0">
+                <li key={a.id} className="border-b border-slate-500/10 pb-3 last:border-0">
                   <div className="font-medium">{a.pinned && "📌 "}{a.title}</div>
                   <div className="line-clamp-2 text-sm text-slate-600">{a.body}</div>
                   <div className="mt-1 text-xs text-slate-400">{date(a.createdAt)}</div>
@@ -56,7 +57,7 @@ export default async function Dashboard() {
             <ul className="space-y-2">
               {polls.map((p) => (
                 <li key={p.id}>
-                  <Link href={`/polls/${p.id}`} className="block rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
+                  <Link href={`/polls/${p.id}`} className="block rounded-2xl border border-white/50 bg-white/30 p-3 transition hover:bg-white/50 dark:bg-white/5">
                     <div className="font-medium">{p.question}</div>
                     <div className="text-xs text-slate-500">Краен срок: {date(p.closesAt)}</div>
                   </Link>

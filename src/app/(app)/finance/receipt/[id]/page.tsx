@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireMembership } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { date, money, PAYMENT_METHODS } from "@/lib/format";
-import { PrintButton } from "./PrintButton";
+import { PrintButton } from "@/components/PrintButton";
 
 export default async function Receipt({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -40,7 +40,7 @@ export const UNIT_KINDS: Record<string, string> = {
 };
 
 export const ISSUE_STATUS: Record<string, { label: string; cls: string }> = {
-  OPEN: { label: "Нов", cls: "bg-red-100 text-red-700" },
-  IN_PROGRESS: { label: "В процес", cls: "bg-amber-100 text-amber-700" },
-  RESOLVED: { label: "Решен", cls: "bg-green-100 text-green-700" },
+  OPEN: { label: "Нов", cls: "bg-red-500/15 text-red-600" },
+  IN_PROGRESS: { label: "В процес", cls: "bg-amber-500/15 text-amber-700" },
+  RESOLVED: { label: "Решен", cls: "bg-green-500/15 text-green-700" },
 };

@@ -13,11 +13,16 @@ model User {
   name         String
   phone        String?
   passwordHash String
+  notifyEmail  Boolean      @default(true)
+  notifySms    Boolean      @default(false)
+  notifyViber  Boolean      @default(false)
   createdAt    DateTime     @default(now())
+  notifications Notification[]
   memberships  Membership[]
   announcements Announcement[]
   issues       Issue[]
   votes        Vote[]
+  onlinePayments OnlinePayment[]
 }
 
 // Етажна собственост (сграда / вход)
@@ -29,7 +34,17 @@ model Building {
   bulstat       String?
   iban          String?
   inviteCode    String         @unique
+  // Stripe Connect сметка на етажната собственост (парите отиват директно при нея)
+  stripeAccountId      String?  @unique
+  stripeChargesEnabled Boolean  @default(false)
+  // Абонамент за платформата: FREE (до 10 обекта) | PRO (на обект / месец)
+  plan                 String    @default("FREE")
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  subscriptionStatus   String?
+  currentPeriodEnd     DateTime?
   createdAt     DateTime       @default(now())
+  onlinePayments OnlinePayment[]
   memberships   Membership[]
   units         Unit[]
   expenses      Expense[]
@@ -72,6 +87,7 @@ model Unit {
   payments    Payment[]
   memberships Membership[]
   votes       Vote[]
+  onlinePayments OnlinePayment[]
 
   @@unique([buildingId, number])
 }
@@ -98,6 +114,27 @@ model Payment {
   note      String?
   createdAt DateTime @default(now())
   unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  online    OnlinePayment?
+}
+
+// Опит за онлайн плащане с карта (Stripe Checkout или тестов режим)
+model OnlinePayment {
+  id          String    @id @default(cuid())
+  buildingId  String
+  unitId      String
+  userId      String
+  amount      Float
+  platformFee Float     @default(0)
+  status      String    @default("PENDING") // PENDING | PAID | CANCELED
+  provider    String    // stripe | mock
+  providerRef String?   @unique // Stripe Checkout Session id
+  paymentId   String?   @unique
+  createdAt   DateTime  @default(now())
+  paidAt      DateTime?
+  building    Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  unit        Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment     Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 }
 
 model Expense {
@@ -175,4 +212,38 @@ model Issue {
   updatedAt   DateTime @updatedAt
   building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+// Известие в приложението (дублира се по имейл / SMS / Viber според настройките)
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String
+  buildingId String?
+  title      String
+  body       String
+  link       String?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+// Ред от импортирано банково извлечение
+model BankTxn {
+  id              String   @id @default(cuid())
+  buildingId      String
+  hash            String
+  date            DateTime
+  amount          Float
+  reason          String
+  counterparty    String?
+  suggestedUnitId String?
+  confidence      String?  // HIGH | MEDIUM
+  status          String   @default("NEW") // NEW | IMPORTED | IGNORED
+  paymentId       String?
+  createdAt       DateTime @default(now())
+
+  @@unique([buildingId, hash])
+  @@index([buildingId, status])
 }

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireManager, requireMembership } from "@/lib/auth";
 import { optStr, str } from "@/lib/util";
+import { notify } from "@/lib/notify";
+import { date } from "@/lib/format";
 
 export async function createPoll(form: FormData) {
   const { building } = await requireManager();
@@ -19,6 +21,7 @@ export async function createPoll(form: FormData) {
       options: { create: labels.map((label, order) => ({ label, order })) },
     },
   });
+  await notify({ buildingId: building.id, roles: ["RESIDENT"] }, { title: "🗳️ Ново гласуване", body: `${question} — гласувайте до ${date(poll.closesAt)}.`, link: `/polls/${poll.id}` });
   redirect(`/polls/${poll.id}`);
 }
 

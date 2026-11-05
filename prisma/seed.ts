@@ -12,14 +12,14 @@ async function main() {
   const resident = await db.user.create({ data: { name: "Мария Петрова", email: "resident@demo.bg", passwordHash: hash } });
 
   const b = await db.building.create({
-    data: { name: "ЕС бл. 12, вх. А", address: "ж.к. Младост 1, бл. 12, вх. А", city: "София", bulstat: "176543210", iban: "BG80BNBG96611020345678", inviteCode: "DEMO2026" },
+    data: { name: "ЕС бл. 12, вх. А", address: "ж.к. Младост 1, бл. 12, вх. А", city: "София", bulstat: "176543210", iban: "BG80BNBG96611020345678", inviteCode: "DEMO2026", plan: "PRO", subscriptionStatus: "active", currentPeriodEnd: new Date(Date.now() + 20 * 864e5) },
   });
   const owners = ["Иван Иванов", "Мария Петрова", "Петър Георгиев", "Елена Стоянова", "Николай Колев", "Десислава Тодорова", "Христо Василев", "Анна Николова", "Димитър Попов", "Светлана Илиева", "Борис Михайлов", "Кристина Ангелова"];
   const units = [];
   for (let i = 0; i < owners.length; i++) {
     const residents = [1, 2, 3, 4, 2, 3][i % 6];
     units.push(await db.unit.create({
-      data: { buildingId: b.id, number: String(i + 1), floor: Math.floor(i / 3) + 1, entrance: "А", area: 65 + (i % 4) * 10, idealParts: Math.round((100 / owners.length) * 100) / 100, ownerName: owners[i], residents, monthlyFee: 8 + residents * 3 },
+      data: { buildingId: b.id, number: String(i + 1), floor: Math.floor(i / 3) + 1, entrance: "А", area: 65 + (i % 4) * 10, idealParts: Math.round((100 / owners.length) * 100) / 100, ownerName: owners[i], residents, monthlyFee: 10 + residents * 4 },
     }));
   }
   await db.membership.createMany({ data: [
@@ -39,8 +39,8 @@ async function main() {
     }
     await db.expense.createMany({ data: [
       { buildingId: b.id, date: new Date(d.getFullYear(), d.getMonth(), 15), category: "ELECTRICITY", amount: 38 + k * 3, description: "Ток общи части", vendor: "ЕРМ Запад" },
-      { buildingId: b.id, date: new Date(d.getFullYear(), d.getMonth(), 20), category: "CLEANING", amount: 60, description: "Почистване на входа", vendor: "Чисто ЕООД" },
-      { buildingId: b.id, date: new Date(d.getFullYear(), d.getMonth(), 22), category: "ELEVATOR", amount: 45, description: "Абонаментна поддръжка на асансьора", vendor: "Асансьори АД" },
+      { buildingId: b.id, date: new Date(d.getFullYear(), d.getMonth(), 20), category: "CLEANING", amount: 40, description: "Почистване на входа", vendor: "Чисто ЕООД" },
+      { buildingId: b.id, date: new Date(d.getFullYear(), d.getMonth(), 22), category: "ELEVATOR", amount: 35, description: "Абонаментна поддръжка на асансьора", vendor: "Асансьори АД" },
     ] });
   }
   await db.expense.create({ data: { buildingId: b.id, date: new Date(now.getFullYear(), now.getMonth() - 1, 5), category: "REPAIR", amount: 120, description: "Смяна на брава на входната врата", vendor: "Майстор Пешо" } });

@@ -33,12 +33,12 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {poll.description && <Card><p className="whitespace-pre-line text-sm">{poll.description}</p></Card>}
-          <Card title="Резултати" action={<Badge className={open ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}>{open ? "Активно" : "Приключило"}</Badge>}>
+          <Card title="Резултати" action={<Badge className={open ? "bg-green-500/15 text-green-700" : "bg-slate-500/15 text-slate-600"}>{open ? "Активно" : "Приключило"}</Badge>}>
             <ul className="space-y-4">
               {results.map((r) => (
                 <li key={r.o.id}>
                   <div className="flex justify-between text-sm"><span className="font-medium">{r.o.label}</span><span>{r.count} гл. · {r.pct.toFixed(1)}% ид.ч.</span></div>
-                  <div className="mt-1 h-3 rounded-full bg-slate-100"><div className="h-3 rounded-full bg-brand-500" style={{ width: `${Math.min(100, r.pct)}%` }} /></div>
+                  <div className="mt-1 h-3 rounded-full bg-slate-500/15"><div className="h-3 rounded-full bg-brand-500" style={{ width: `${Math.min(100, r.pct)}%` }} /></div>
                 </li>
               ))}
             </ul>
@@ -65,7 +65,7 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
               : (
                 <form action={vote.bind(null, poll.id)} className="space-y-2">
                   {poll.options.map((o) => (
-                    <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm hover:bg-slate-50">
+                    <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/40 p-3 text-sm hover:bg-white/25">
                       <input type="radio" name="optionId" value={o.id} defaultChecked={myVote?.optionId === o.id} required /> {o.label}
                     </label>
                   ))}
@@ -75,7 +75,8 @@ export default async function PollPage({ params }: { params: Promise<{ id: strin
           </Card>
           {isManager && (
             <Card title="Управление">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Link href={`/polls/${poll.id}/protocol`} className="btn-secondary btn-sm">📄 Протокол (PDF)</Link>
                 {open && <form action={closePoll.bind(null, poll.id)}><SubmitButton className="btn-secondary btn-sm" confirm="Приключване на гласуването сега?">Приключи</SubmitButton></form>}
                 <form action={deletePoll.bind(null, poll.id)}><SubmitButton className="btn-danger btn-sm" confirm="Изтриване на гласуването?">Изтрий</SubmitButton></form>
               </div>

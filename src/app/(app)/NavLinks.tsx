@@ -2,19 +2,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function NavLinks({ links }: { links: { href: string; label: string; icon: string }[] }) {
+export function NavLinks({ links }: { links: { href: string; label: string; icon: string; badge?: number }[] }) {
   const path = usePathname();
   return (
-    <nav className="flex gap-1 overflow-x-auto md:flex-col">
+    <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0">
       {links.map((l) => {
         const active = path === l.href || path.startsWith(l.href + "/");
         return (
           <Link
             key={l.href}
             href={l.href}
-            className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm ${active ? "bg-brand-50 font-semibold text-brand-700" : "text-slate-600 hover:bg-slate-100"}`}
+            className={active ? "nav-pill nav-pill-active" : "nav-pill"}
           >
-            <span>{l.icon}</span>{l.label}
+            <span>{l.icon}</span>{l.label}{!!l.badge && <span className="ml-auto rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">{l.badge}</span>}
           </Link>
         );
       })}

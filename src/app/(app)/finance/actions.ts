@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { requireManager } from "@/lib/auth";
 import { CHARGE_TYPES, periodLabel } from "@/lib/format";
 import { num, optStr, str } from "@/lib/util";
+import { notify } from "@/lib/notify";
+import { money } from "@/lib/format";
+import { unitBalances } from "@/lib/finance";
 
 /** Начислява месечните такси за период на всички обекти (без дублиране). */
 export async function generateMonthly(form: FormData) {
@@ -26,7 +29,10 @@ export async function generateMonthly(form: FormData) {
     if (repairPerUnit > 0 && !has.has(`${u.id}:REPAIR_FUND`))
       data.push({ unitId: u.id, period, type: "REPAIR_FUND", description: `${CHARGE_TYPES.REPAIR_FUND} — ${periodLabel(period)}`, amount: repairPerUnit, dueDate });
   }
-  if (data.length) await db.charge.createMany({ data });
+  if (data.length) {
+    await db.charge.createMany({ data });
+    await notify({ buildingId: building.id, roles: ["RESIDENT"] }, { title: `Начислени такси — ${periodLabel(period)}`, body: `Таксите за ${periodLabel(period)} са начислени. Срок за плащане: 25-то число.`, link: "/finance" });
+  }
   revalidatePath("/finance");
 }
 
@@ -48,6 +54,7 @@ export async function oneTimeCharge(form: FormData) {
       amount: basis === "idealParts" && sumIdeal > 0 ? Math.round((total * u.idealParts / sumIdeal) * 100) / 100 : total,
     })),
   });
+  await notify({ buildingId: building.id, roles: ["RESIDENT"] }, { title: `Нова вноска: ${description}`, body: `Начислена е еднократна вноска „${description}“. Проверете сумата за вашия обект.`, link: "/finance" });
   revalidatePath("/finance");
 }
 
@@ -61,6 +68,7 @@ export async function recordPayment(form: FormData) {
   await db.payment.create({
     data: { unitId, amount, method: str(form, "method") || "CASH", note: optStr(form, "note"), paidAt: d ? new Date(d) : new Date() },
   });
+  await notify({ buildingId: building.id, unitIds: [unitId] }, { title: "Получено плащане", body: `Регистрирано е плащане от ${money(amount)} за обект ${unit.number}. Благодарим!`, link: "/finance" });
   revalidatePath("/finance");
 }
 
@@ -68,4 +76,20 @@ export async function deletePayment(id: string) {
   const { building } = await requireManager();
   await db.payment.deleteMany({ where: { id, unit: { buildingId: building.id } } });
   revalidatePath("/finance");
+}
+
+/** Напомняне до всички длъжници (в приложението + имейл/SMS/Viber). */
+export async function remindDebtors() {
+  const { building } = await requireManager();
+  const debtors = (await unitBalances(building.id)).filter((b) => b.balance > 0);
+  let sent = 0;
+  for (const d of debtors) {
+    sent += await notify({ buildingId: building.id, unitIds: [d.unit.id] }, {
+      title: "Напомняне за неплатени такси",
+      body: `Обект ${d.unit.number} има задължение от ${money(d.balance)}. Можете да платите онлайн с карта.`,
+      link: "/finance",
+    });
+  }
+  const { redirect } = await import("next/navigation");
+  redirect(`/finance?reminded=${sent}`);
 }

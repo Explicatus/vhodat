@@ -44,7 +44,7 @@ export default async function Expenses() {
                 {cats.map(([c, v]) => (
                   <li key={c}>
                     <div className="flex justify-between text-sm"><span>{EXPENSE_CATEGORIES[c] ?? c}</span><span className="font-medium">{money(v)}</span></div>
-                    <div className="mt-1 h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-brand-500" style={{ width: `${(v / total) * 100}%` }} /></div>
+                    <div className="mt-1 h-2 rounded-full bg-slate-500/15"><div className="h-2 rounded-full bg-brand-500" style={{ width: `${(v / total) * 100}%` }} /></div>
                   </li>
                 ))}
                 <li className="flex justify-between border-t pt-2 font-semibold"><span>Общо</span><span>{money(total)}</span></li>
