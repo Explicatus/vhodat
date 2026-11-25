@@ -26,17 +26,20 @@
 ## Стек
 Next.js 15 (App Router, Server Actions) · TypeScript · Prisma · PostgreSQL · Tailwind CSS · JWT сесии · Stripe (Connect + Billing) · Nodemailer (SMTP) · Infobip (SMS/Viber)
 
-## Стартиране
-Нужни са Node.js 22 и PostgreSQL 16 (най-лесно с Docker).
+## Стартиране локално
+Нужни са **Node.js 22**, **Git** и **Docker Desktop** (за PostgreSQL).
 ```bash
+git clone https://github.com/Explicatus/vhodat.git
+cd vhodat
 npm install
-cp .env.example .env
+cp .env.example .env      # Windows (PowerShell): copy .env.example .env
 docker compose up -d db   # PostgreSQL на localhost:5432
-npm run db:migrate        # прилага миграциите
+npm run db:deploy         # прилага миграциите
 npm run db:seed           # демо данни
 npm run dev               # http://localhost:3000
 ```
 Демо акаунти: `manager@demo.bg` / `demo1234` (управител), `resident@demo.bg` / `demo1234` (собственик, ап. 2). Код за покана: `DEMO2026`.
+Локално плащанията с карта са симулирани, а имейлите/SMS се показват в терминала, където върви `npm run dev`.
 
 ### Промени в базата
 Схемата е в `prisma/schema.prisma`. След промяна: `npm run db:migrate -- --name описание` създава нова миграция в `prisma/migrations/` — commit-нете я заедно с кода. В продукция `prisma migrate deploy` (автоматично в Docker) прилага само новите миграции, без да трие данни.

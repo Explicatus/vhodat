@@ -1,7 +1,11 @@
+import { existsSync } from "fs";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 
+// скриптът върви извън Next.js, затова сам зарежда .env (без да презаписва вече зададени променливи)
+if (!process.env.DATABASE_URL && existsSync(".env")) process.loadEnvFile(".env");
+if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL не е зададен — копирайте .env.example като .env");
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 
 async function main() {
