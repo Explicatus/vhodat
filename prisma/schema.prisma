@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  // без нативен двоичен файл: заявките минават през драйвера pg (работи и в Cloudflare Workers)
+  engineType = "client"
 }
 
 datasource db {

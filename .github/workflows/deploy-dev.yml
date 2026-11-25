@@ -1,0 +1,108 @@
+name: Deploy dev
+
+# dev.vhodat.bg се обновява автоматично след всеки успешен CI на main.
+# Ръчно: Actions → Deploy dev → Run workflow (с отметка „seed“ за демо данни).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Зареди демо данните (нулира само демо сградата DEMO2026)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: dev
+      url: https://dev.vhodat.bg
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check required secrets
+        id: check
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          names="CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID DATABASE_URL DIRECT_DATABASE_URL SESSION_SECRET CRON_SECRET"
+          set=0; missing=""
+          for n in $names; do if [ -n "${!n}" ]; then set=$((set+1)); else missing="$missing $n"; fi; done
+          if [ "$set" -eq 0 ]; then
+            echo "::notice::Деплоят на dev е пропуснат: още няма зададени secrets (вижте README → Dev среда в Cloudflare)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -n "$missing" ]; then
+            for n in $missing; do echo "::error::Липсва GitHub secret $n (Settings → Secrets and variables → Actions)"; done
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+        if: steps.check.outputs.ready == 'true'
+
+      # миграциите вървят през директната (не pooled) връзка към Neon
+      - name: Apply database migrations
+        if: steps.check.outputs.ready == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npx prisma migrate deploy
+
+      - name: Seed demo data
+        if: steps.check.outputs.ready == 'true' && github.event_name == 'workflow_dispatch' && inputs.seed
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run db:seed
+
+      - name: Build for Cloudflare Workers
+        if: steps.check.outputs.ready == 'true'
+        env:
+          APP_URL: https://dev.vhodat.bg
+          NOINDEX: "1"
+        run: npx opennextjs-cloudflare build
+
+      - name: Deploy worker
+        if: steps.check.outputs.ready == 'true'
+        run: npx wrangler deploy
+
+      - name: Upload worker secrets
+        if: steps.check.outputs.ready == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          node -e 'process.stdout.write(JSON.stringify({DATABASE_URL:process.env.DATABASE_URL,SESSION_SECRET:process.env.SESSION_SECRET,CRON_SECRET:process.env.CRON_SECRET}))' > secrets.json
+          npx wrangler secret bulk secrets.json
+          rm -f secrets.json
+
+      # първият път Cloudflare издава SSL сертификат за домейна — може да отнеме няколко минути
+      - name: Smoke test
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          for i in $(seq 1 30); do
+            body=$(curl -fsS https://dev.vhodat.bg/api/health 2>/dev/null) && echo "$body" | grep -q '"ok":true' && { echo "✓ $body"; exit 0; }
+            echo "чакам dev.vhodat.bg ($i/30)… $body"; sleep 20
+          done
+          echo "::error::dev.vhodat.bg/api/health не отговаря с ok — вижте Cloudflare → Workers → vhodat-dev → Logs"; exit 1

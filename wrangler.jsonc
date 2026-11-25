@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // dev средата на „Входът“ — https://dev.vhodat.bg
+  "name": "vhodat-dev",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  // Cloudflare създава DNS записа и SSL сертификата автоматично
+  "routes": [{ "pattern": "dev.vhodat.bg", "custom_domain": true }],
+  "workers_dev": false,
+  // всеки ден в 04:17 UTC (06:17/07:17 българско време)
+  "triggers": { "crons": ["17 4 * * *"] },
+  "vars": {
+    "APP_URL": "https://dev.vhodat.bg",
+    // dev: плащанията с карта и абонаментите са симулирани, без Stripe
+    "PAYMENTS_MOCK": "1",
+    "PLATFORM_FEE_PERCENT": "1"
+  },
+  // тайните (DATABASE_URL, SESSION_SECRET, CRON_SECRET) се задават с `wrangler secret`, не тук
+  "observability": { "enabled": true }
+}

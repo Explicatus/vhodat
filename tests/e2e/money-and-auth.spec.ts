@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { lastMail, login, newPage, register, resetDb, row, uniqueEmail } from "../helpers";
+import { NO_OUTBOX, lastMail, login, newPage, register, resetDb, row, uniqueEmail } from "../helpers";
 
 /** Пари в центове, корекции, заявки за обект, пароли и имейли. */
 test.describe.configure({ mode: "serial" });
@@ -79,6 +79,7 @@ test("управителят одобрява и съседът получава
 });
 
 test("потвърждаване на имейла; линкът е еднократен", async () => {
+  test.skip(NO_OUTBOX, "изисква тестовата пощенска кутия на сървъра");
   await n.goto("/dashboard");
   await expect(n.getByText("Потвърдете имейла си")).toBeVisible();
   const mail = await lastMail(email, "Потвърдете имейла");
@@ -98,6 +99,7 @@ test("забравена парола не издава дали акаунтъ�
 });
 
 test("нова парола: старите сесии спират, линкът е еднократен", async ({ browser }) => {
+  test.skip(NO_OUTBOX, "изисква тестовата пощенска кутия на сървъра");
   const x = await newPage(browser);
   await x.goto("/forgot");
   await x.fill("input[name=email]", email);
@@ -116,6 +118,7 @@ test("нова парола: старите сесии спират, линкъ�
 });
 
 test("различни пароли се отхвърлят", async ({ browser }) => {
+  test.skip(NO_OUTBOX, "изисква тестовата пощенска кутия на сървъра");
   const x = await newPage(browser);
   await x.goto("/forgot");
   await x.fill("input[name=email]", "resident@demo.bg");

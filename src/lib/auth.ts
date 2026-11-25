@@ -20,7 +20,9 @@ export async function verifyPassword(pw: string, hash: string) {
 /** IP и браузър на текущата заявка (за списъка с устройства и ограничаването на опити). */
 export async function clientInfo() {
   const h = await headers();
-  const ip = (h.get("x-forwarded-for")?.split(",")[0] || h.get("x-real-ip") || "unknown").trim();
+  // зад Cloudflare истинският адрес е в cf-connecting-ip (клиентът не може да го подправи);
+  // x-forwarded-for идва в сила само без Cloudflare (напр. Docker зад nginx)
+  const ip = (h.get("cf-connecting-ip") || h.get("x-forwarded-for")?.split(",")[0] || h.get("x-real-ip") || "unknown").trim();
   return { ip, userAgent: h.get("user-agent")?.slice(0, 300) ?? null };
 }
 

@@ -53,3 +53,6 @@ export async function lastMail(to: string, title: string) {
 
 /** Текстът на ред от таблица, съдържащ `text`. */
 export const row = (page: Page, text: string) => page.locator("tr", { hasText: text });
+
+/** Тестовата пощенска кутия е файл на сървъра — няма я, когато тестваме външен сървър (Worker). */
+export const NO_OUTBOX = !!process.env.E2E_BASE_URL;

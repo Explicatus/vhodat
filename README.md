@@ -63,6 +63,25 @@ npm run test:unit  # само чистите функции — секунди, 
 - „Едър текст“ в профила (запомня се за устройството); уважават се системните настройки „Намали движението“ и „Намали прозрачността“.
 - Стъкленият ефект е оптимизиран за телефони: по-леко размазване, без повторно размазване на вложени панели, без филтър върху фона.
 
+## Dev среда в Cloudflare (dev.vhodat.bg)
+Приложението върви в **Cloudflare Workers** (чрез [OpenNext](https://opennext.js.org/cloudflare)), а базата е в **Neon** (PostgreSQL). GitHub Actions (`.github/workflows/deploy-dev.yml`) публикува автоматично след всеки успешен CI на `main`: прилага миграциите, build-ва за Workers, деплойва и проверява `https://dev.vhodat.bg/api/health`. Ежедневната автоматизация върви през Cloudflare Cron Trigger (`worker.ts`). В dev плащанията са симулирани (`PAYMENTS_MOCK=1`), а имейлите се виждат в Cloudflare → Workers → vhodat-dev → Logs.
+
+**Еднократна настройка:**
+1. **Neon** (neon.tech) → New project, регион **AWS Europe Central (Frankfurt)**. От Connect копирайте два адреса: с включено *Connection pooling* (→ `DATABASE_URL`) и без него (→ `DIRECT_DATABASE_URL`).
+2. **Cloudflare** → My Profile → API Tokens → Create Token → *Edit Cloudflare Workers* (шаблон); в Zone Resources изберете `vhodat.bg`. Копирайте и **Account ID** (дясната колона на Overview за домейна).
+3. **GitHub** → Settings → Secrets and variables → Actions → New repository secret:
+   | Secret | Стойност |
+   |---|---|
+   | `CLOUDFLARE_API_TOKEN` | токенът от т. 2 |
+   | `CLOUDFLARE_ACCOUNT_ID` | Account ID |
+   | `DATABASE_URL` | Neon адрес с pooling |
+   | `DIRECT_DATABASE_URL` | Neon адрес без pooling |
+   | `SESSION_SECRET` | `openssl rand -base64 32` |
+   | `CRON_SECRET` | `openssl rand -base64 32` |
+4. **Actions → Deploy dev → Run workflow** с отметка *seed* (за демо акаунтите). Първият път Cloudflare създава DNS записа и SSL сертификата — до няколко минути.
+
+**Локално в runtime-а на Cloudflare:** създайте `.dev.vars` (`DATABASE_URL`, `SESSION_SECRET`, `CRON_SECRET`, `APP_URL="http://localhost:8787"`), после `npm run cf:preview`. Тестовете срещу него: `E2E_BASE_URL=http://localhost:8787 npx playwright test`.
+
 ## Тестов режим
 С `PAYMENTS_MOCK="1"` и без `STRIPE_SECRET_KEY` плащанията с карта и абонаментите се симулират, а имейлите/SMS/Viber се извеждат в конзолата на сървъра. Така цялата платформа работи локално без външни услуги.
 

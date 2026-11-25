@@ -1,7 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3100;
-export const BASE_URL = `http://localhost:${PORT}`;
+/** E2E_BASE_URL: тестове срещу вече пуснат сървър (напр. Cloudflare Worker-а през `wrangler dev`). */
+const EXTERNAL = process.env.E2E_BASE_URL;
+export const BASE_URL = EXTERNAL ?? `http://localhost:${PORT}`;
 
 /**
  * Тестове:
@@ -22,7 +24,7 @@ export default defineConfig({
     { name: "unit", testMatch: /unit\/.*\.spec\.ts/ },
     { name: "e2e", testMatch: /e2e\/.*\.spec\.ts/, use: { ...devices["Desktop Chrome"], viewport: { width: 1360, height: 900 } } },
   ],
-  webServer: {
+  webServer: EXTERNAL ? undefined : {
     command: `npx next start -p ${PORT}`,
     url: `${BASE_URL}/login`,
     reuseExistingServer: false,

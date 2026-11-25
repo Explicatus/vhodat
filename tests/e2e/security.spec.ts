@@ -63,3 +63,9 @@ test("приложението работи без нарушения на CSP",
   await expect(page.getByRole("heading", { name: "CSP тест" })).toBeVisible();
   expect(violations).toEqual([]);
 });
+
+test("/api/health потвърждава връзката с базата", async ({ request }) => {
+  const res = await request.get("/api/health");
+  expect(res.status()).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, db: "ok" });
+});
